@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Miami-Dade Climate Projects</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        .sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid #dee2e6;
+        }
+        #map {
+            flex: 1;
+            height: 100vh;
+        }
+        .filter-section {
+            margin-bottom: 20px;
+        }
+        .filter-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .filter-option {
+            margin: 5px 0;
+            padding: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .filter-option:hover {
+            background: #e9ecef;
+        }
+        .filter-option.active {
+            background: #007bff;
+            color: white;
+        }
+        .stats {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-item {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .stat-number {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .map-style-controls {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .style-button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            background: white;
+            cursor: pointer;
+            border-radius: 3px;
+            text-align: center;
+        }
+        .style-button:hover {
+            background: #f8f9fa;
+        }
+        .style-button.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .mapboxgl-popup-content {
+            max-width: 300px;
+        }
+        .popup-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .popup-item {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .popup-label {
+            font-weight: bold;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="stats">
+                <h3>Project Statistics</h3>
+                <div class="stat-item">Total Projects: <span class="stat-number" id="total-count">0</span></div>
+                <div class="stat-item">Visible: <span class="stat-number" id="visible-count">0</span></div>
+                <div class="stat-item">Total Investment: <span class="stat-number" id="total-investment">$0</span></div>
+            </div>
+
+            <div class="map-style-controls">
+                <h3>Map Style</h3>
+                <button class="style-button active" data-style="standard">Standard</button>
+                <button class="style-button" data-style="satellite">Satellite</button>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">Project Type</div>
+                <div class="filter-option active" data-filter="all" data-type="type">All Types</div>
+                <div class="filter-option" data-filter="Green Infrastructure" data-type="type">Green Infrastructure</div>
+                <div class="filter-option" data-filter="Grey Infrastructure" data-type="type">Grey Infrastructure</div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">Categories</div>
+                <div class="filter-option active" data-filter="all" data-type="category">All Categories</div>
+                <div class="filter-option" data-filter="Water & Flood Control Infrastructure" data-type="category">Water & Flood Control</div>
+                <div class="filter-option" data-filter="Green Infrastructure & Ecosystem Restoration" data-type="category">Green Infrastructure & Ecosystem</div>
+                <div class="filter-option" data-filter="Connectivity Improvements" data-type="category">Connectivity Improvements</div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">Disaster Focus</div>
+                <div class="filter-option active" data-filter="all" data-type="disaster">All Focus Areas</div>
+                <div class="filter-option" data-filter="Flooding & Sea Level Rise" data-type="disaster">Flooding & Sea Level Rise</div>
+                <div class="filter-option" data-filter="Multi-hazard" data-type="disaster">Multi-hazard</div>
+                <div class="filter-option" data-filter="Critical Infrastructure" data-type="disaster">Critical Infrastructure</div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">Status</div>
+                <div class="filter-option active" data-filter="all" data-type="status">All Status</div>
+                <div class="filter-option" data-filter="Completed" data-type="status">Completed</div>
+                <div class="filter-option" data-filter="Ongoing" data-type="status">Ongoing</div>
+            </div>
+        </div>
+        <div id="map"></div>
+    </div>
+
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+    <script>
+        // Simple Mapbox setup - REPLACE WITH YOUR TOKEN
+        mapboxgl.accessToken = 'PUT_YOUR_MAPBOX_TOKEN_HERE';
+        
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [-80.21171, 25.75350],
+            zoom: 9.98,
+            bearing: 0.00,
+            pitch: 0.00
+        });
+
+        // Add error handling for map
+        map.on('error', function(e) {
+            console.error('Map error:', e);
+        });
+
+        // Global variables
+        let allProjects = [];
+        let markers = [];
+        let filters = {
+            type: 'all',
+            category: 'all',
+            disaster: 'all',
+            status: 'all'
+        };
+
+        map.on('load', function() {
+            console.log('Map loaded successfully');
+            
+            // Load project data
+            fetch('project_inventory_database.geojson')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Loaded', data.features.length, 'projects');
+                    allProjects = data.features;
+                    
+                    // Create markers for all projects
+                    createMarkers(allProjects);
+                    updateStats();
+                    
+                    // Setup filter event listeners
+                    setupFilters();
+                    
+                    // Setup map style switcher
+                    setupMapStyleSwitcher();
+                    
+                    console.log('All markers added to map');
+                    
+                    // Fit map to show all markers
+                    fitMapToMarkers();
+                })
+                .catch(error => {
+                    console.error('Error loading data:', error);
+                    alert('Error loading project data: ' + error.message);
+                });
+        });
+
+        // Function to create markers
+        function createMarkers(projects) {
+            // Clear existing markers
+            markers.forEach(marker => marker.remove());
+            markers = [];
+            
+            projects.forEach(feature => {
+                const coords = feature.geometry.coordinates;
+                const props = feature.properties;
+                
+                // Create popup content
+                const popupContent = `
+                    <div class="popup-title">${props['Project Name']}</div>
+                    <div class="popup-item">
+                        <span class="popup-label">Type:</span> ${props['Type']}
+                    </div>
+                    <div class="popup-item">
+                        <span class="popup-label">Category:</span> ${props['Categories']}
+                    </div>
+                    <div class="popup-item">
+                        <span class="popup-label">Disaster Focus:</span> ${props['Disaster Focus']}
+                    </div>
+                    <div class="popup-item">
+                        <span class="popup-label">City:</span> ${props['City']}
+                    </div>
+                    <div class="popup-item">
+                        <span class="popup-label">Status:</span> ${props['Project Status']}
+                    </div>
+                    <div class="popup-item">
+                        <span class="popup-label">Cost:</span> ${props['Esimated Project Cost']}
+                    </div>
+                `;
+                
+                // Create marker with color based on type
+                const color = props['Type'] === 'Green Infrastructure' ? '#e74c3c' : '#3498db';
+                
+                // Create marker
+                const marker = new mapboxgl.Marker({ color: color })
+                    .setLngLat(coords)
+                    .setPopup(new mapboxgl.Popup().setHTML(popupContent))
+                    .addTo(map);
+                
+                markers.push(marker);
+            });
+        }
+
+        // Function to filter projects
+        function filterProjects() {
+            const filtered = allProjects.filter(project => {
+                const props = project.properties;
+                return (
+                    (filters.type === 'all' || props['Type'] === filters.type) &&
+                    (filters.category === 'all' || props['Categories'] === filters.category) &&
+                    (filters.disaster === 'all' || props['Disaster Focus'] === filters.disaster) &&
+                    (filters.status === 'all' || props['Project Status'] === filters.status)
+                );
+            });
+            
+            createMarkers(filtered);
+            updateStats();
+            fitMapToMarkers();
+        }
+
+        // Function to setup filter event listeners
+        function setupFilters() {
+            document.querySelectorAll('.filter-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    const filterType = this.dataset.type;
+                    const filterValue = this.dataset.filter;
+                    
+                    // Update active state
+                    document.querySelectorAll(`[data-type="${filterType}"]`).forEach(opt => {
+                        opt.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    
+                    // Update filter
+                    filters[filterType] = filterValue;
+                    
+                    // Apply filters
+                    filterProjects();
+                });
+            });
+        }
+
+        // Function to update statistics
+        function updateStats() {
+            const visibleCount = markers.length;
+            const totalCount = allProjects.length;
+            
+            // Calculate total investment
+            let totalInvestment = 0;
+            allProjects.forEach(project => {
+                const cost = project.properties['Esimated Project Cost'];
+                if (cost) {
+                    const numericCost = parseFloat(cost.replace(/[$,]/g, ''));
+                    if (!isNaN(numericCost)) {
+                        totalInvestment += numericCost;
+                    }
+                }
+            });
+            
+            document.getElementById('total-count').textContent = totalCount;
+            document.getElementById('visible-count').textContent = visibleCount;
+            document.getElementById('total-investment').textContent = '$' + Math.round(totalInvestment / 1000000) + 'M+';
+        }
+
+        // Function to fit map to visible markers
+        function fitMapToMarkers() {
+            if (markers.length > 0) {
+                const bounds = new mapboxgl.LngLatBounds();
+                markers.forEach(marker => {
+                    bounds.extend(marker.getLngLat());
+                });
+                map.fitBounds(bounds, { padding: 50 });
+            }
+        }
+
+        // Function to setup map style switcher
+        function setupMapStyleSwitcher() {
+            document.querySelectorAll('.style-button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const style = this.dataset.style;
+                    
+                    // Update active state
+                    document.querySelectorAll('.style-button').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    
+                    // Change map style
+                    if (style === 'satellite') {
+                        map.setStyle({
+                            version: 8,
+                            sources: {
+                                'mapbox-satellite': {
+                                    type: 'raster',
+                                    url: 'mapbox://mapbox.satellite',
+                                    tileSize: 256
+                                }
+                            },
+                            layers: [{
+                                id: 'satellite',
+                                type: 'raster',
+                                source: 'mapbox-satellite',
+                                paint: {
+                                    'raster-opacity': 1
+                                }
+                            }]
+                        });
+                    } else {
+                        map.setStyle('mapbox://styles/mapbox/streets-v12');
+                    }
+                });
+            });
+        }
+
+        // Add basic navigation controls
+        map.addControl(new mapboxgl.NavigationControl());
+    </script>
+</body>
+</html>
