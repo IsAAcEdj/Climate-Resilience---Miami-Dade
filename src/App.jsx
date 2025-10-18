@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
-import features from './project_inventory_database.geojson';
 
 const App = () => {
   const mapContainer = useRef(null);
@@ -10,6 +9,7 @@ const App = () => {
   const [allMarkers, setAllMarkers] = useState([]);
   const [currentDistrict, setCurrentDistrict] = useState(null);
   const [allProjectsData, setAllProjectsData] = useState(null);
+  const [isSatelliteView, setIsSatelliteView] = useState(false);
 
   // Define district boundaries
   const districts = {
@@ -196,6 +196,81 @@ const App = () => {
       zoom: 11,
       duration: 1500
     });
+  };
+
+  // Toggle between satellite and standard map
+  const toggleMapStyle = () => {
+    if (!map.current) return;
+    
+    const newStyle = isSatelliteView ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/satellite-v9';
+    
+    map.current.once('styledata', () => {
+      // Re-add district polygons after style change
+      Object.keys(districts).forEach(districtId => {
+        const district = districts[districtId];
+        
+        if (!map.current.getSource(districtId)) {
+          map.current.addSource(districtId, {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'Polygon',
+                coordinates: [district.coordinates]
+              }
+            }
+          });
+        }
+
+        if (!map.current.getLayer(`${districtId}-fill`)) {
+          map.current.addLayer({
+            id: `${districtId}-fill`,
+            type: 'fill',
+            source: districtId,
+            paint: {
+              'fill-color': '#3498db',
+              'fill-opacity': 0.1
+            }
+          });
+        }
+
+        if (!map.current.getLayer(`${districtId}-outline`)) {
+          map.current.addLayer({
+            id: `${districtId}-outline`,
+            type: 'line',
+            source: districtId,
+            paint: {
+              'line-color': '#2980b9',
+              'line-width': 2,
+              'line-opacity': 0.5
+            }
+          });
+        }
+
+        // Re-add event listeners
+        map.current.on('click', `${districtId}-fill`, () => {
+          zoomToDistrict(districtId);
+        });
+
+        map.current.on('mouseenter', `${districtId}-fill`, () => {
+          map.current.getCanvas().style.cursor = 'pointer';
+        });
+
+        map.current.on('mouseleave', `${districtId}-fill`, () => {
+          map.current.getCanvas().style.cursor = '';
+        });
+      });
+
+      // Re-add project markers
+      if (allProjectsData) {
+        allMarkers.forEach(marker => {
+          marker.addTo(map.current);
+        });
+      }
+    });
+    
+    map.current.setStyle(newStyle);
+    setIsSatelliteView(!isSatelliteView);
   };
 
   useEffect(() => {
@@ -450,6 +525,46 @@ const App = () => {
               }}
             >
               Reset View
+            </button>
+          </div>
+
+          {/* Map Style Toggle */}
+          <div style={{ 
+            position: 'absolute', 
+            bottom: '20px', 
+            right: '20px', 
+            background: 'white', 
+            borderRadius: '25px', 
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)', 
+            zIndex: 1000,
+            overflow: 'hidden'
+          }}>
+            <button
+              onClick={toggleMapStyle}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '8px 12px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.8em',
+                color: '#2c3e50',
+                transition: 'all 0.3s',
+                minWidth: '120px'
+              }}
+            >
+              <div style={{ 
+                marginRight: '8px', 
+                fontSize: '16px',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                {isSatelliteView ? '🗺️' : '🛰️'}
+              </div>
+              <span style={{ fontWeight: '500' }}>
+                {isSatelliteView ? 'Standard' : 'Satellite'}
+              </span>
             </button>
           </div>
         </div>
