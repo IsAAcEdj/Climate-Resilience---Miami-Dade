@@ -4,6 +4,7 @@ import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
 const App = () => {
   const mapContainer = useRef(null);
   const map = useRef(null);
+  const districtsRef = useRef({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [allMarkers, setAllMarkers] = useState([]);
@@ -12,36 +13,7 @@ const App = () => {
   const [isSatelliteView, setIsSatelliteView] = useState(false);
 
   // Define district boundaries
-  const districts = {
-    'cutler-bay': {
-      name: 'Cutler Bay',
-      coordinates: [
-        [-80.40, 25.55],
-        [-80.30, 25.55],
-        [-80.30, 25.60],
-        [-80.35, 25.60],
-        [-80.40, 25.55]
-      ],
-      center: [-80.325, 25.575],
-      zoom: 13
-    },
-    'miami-beach': {
-      name: 'Miami Beach',
-      coordinates: [
-        [-80.15, 25.75],
-        [-80.13, 25.75],
-        [-80.115, 25.84],
-        [-80.115, 25.88],
-        [-80.12, 25.90],
-        [-80.15, 25.89],
-        [-80.15, 25.82],
-        [-80.17, 25.77],
-        [-80.15, 25.75]
-      ],
-      center: [-80.13, 25.785],
-      zoom: 13
-    }
-  };
+  
 
   // Get marker color based on project type
   const getMarkerColor = (projectType) => {
@@ -125,7 +97,7 @@ const App = () => {
 
   // Zoom to district
   const zoomToDistrict = (districtId) => {
-    const district = districts[districtId];
+    const district = districtsRef.current[districtId];
     if (!district || !map.current) return;
 
     setCurrentDistrict(districtId);
@@ -136,7 +108,7 @@ const App = () => {
       duration: 1500
     });
 
-    Object.keys(districts).forEach(id => {
+    Object.keys(districtsRef.current).forEach(id => {
       map.current.setPaintProperty(
         `${id}-fill`,
         'fill-opacity',
@@ -179,7 +151,7 @@ const App = () => {
     
     setCurrentDistrict(null);
 
-    Object.keys(districts).forEach(id => {
+    Object.keys(districtsRef.current).forEach(id => {
       map.current.setPaintProperty(`${id}-fill`, 'fill-opacity', 0.1);
       map.current.setPaintProperty(`${id}-outline`, 'line-opacity', 0.5);
       map.current.setPaintProperty(`${id}-outline`, 'line-width', 2);
@@ -206,8 +178,8 @@ const App = () => {
     
     map.current.once('styledata', () => {
       // Re-add district polygons after style change
-      Object.keys(districts).forEach(districtId => {
-        const district = districts[districtId];
+      Object.keys(districtsRef.current).forEach(districtId => {
+        const district = districtsRef.current[districtId];
         
         if (!map.current.getSource(districtId)) {
           map.current.addSource(districtId, {
@@ -278,6 +250,43 @@ const App = () => {
 
     mapboxgl.accessToken = 'pk.eyJ1IjoiaXNhYWNlZGoiLCJhIjoiY21naTVhc3ZkMDVtbjJzcHBwdnFuOW44MSJ9.3B7ShXPP1-_51v1sFoVMKA';
     
+    const loadDistricts = async () => {
+    try {
+      const response = await fetch('miami_cities.geojson');
+      const geojson = await response.json();
+
+      const districts = {};
+
+      geojson.features.forEach((feature) => {
+        const coordinates = feature.geometry.coordinates[0];
+        const lngs = coordinates.map(c => c[0]);
+        const lats = coordinates.map(c => c[1]);
+        const name = feature.properties['NAME'];
+        const center = {
+          lng: lngs.reduce((a, b) => a + b) / lngs.length,
+          lat: lats.reduce((a, b) => a + b) / lats.length
+        };
+        const districtId = feature.properties['OBJECTID'];
+        const zoom = 13;
+        districts[districtId] = {
+          name,
+          coordinates,
+          zoom,
+          center
+        }
+       {}});
+      districtsRef.current = districts;
+    }catch(err) {
+      console.error('Error loading cities:', err);
+    }
+    }
+
+    const init = async () => {
+      await loadDistricts();
+    };
+
+    init();
+
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/light-v11',
@@ -295,8 +304,8 @@ const App = () => {
     map.current.on('load', async () => {
       try {
         // Add district polygons
-        Object.keys(districts).forEach(districtId => {
-          const district = districts[districtId];
+        Object.keys(districtsRef.current).forEach(districtId => {
+          const district = districtsRef.current[districtId];
           
           map.current.addSource(districtId, {
             type: 'geojson',
@@ -473,7 +482,7 @@ const App = () => {
 
           <div style={{ position: 'absolute', top: '20px', right: '20px', background: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', zIndex: 1000, minWidth: '200px' }}>
             <h4 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '1em' }}>Special Districts</h4>
-            <button
+            {/* <button
               onClick={() => zoomToDistrict('cutler-bay')}
               style={{
                 display: 'block',
@@ -508,7 +517,7 @@ const App = () => {
               }}
             >
               Miami Beach
-            </button>
+            </button> */}
             <button
               onClick={resetView}
               style={{
