@@ -101,7 +101,7 @@ const App = () => {
     if (!district || !map.current) return;
 
     setCurrentDistrict(districtId);
-
+    console.log(district.zoom);
     map.current.flyTo({
       center: district.center,
       zoom: district.zoom,
@@ -267,7 +267,16 @@ const App = () => {
           lat: lats.reduce((a, b) => a + b) / lats.length
         };
         const districtId = feature.properties['OBJECTID'];
-        const zoom = 13;
+        const cn = Math.pow(-(Math.min(...lngs) - Math.max(...lngs)), 0.12);
+        const cs = Math.pow(-(Math.min(...lats) - Math.max(...lats)), 0.12);
+        let cf = 0;
+        if(cn > cs) {
+          cf = cn;
+        } else {
+          cf = cs
+        }
+        const zoom = 9 / cf;
+        console.log(name + ": " + zoom + " " + cn);
         districts[districtId] = {
           name,
           coordinates,
