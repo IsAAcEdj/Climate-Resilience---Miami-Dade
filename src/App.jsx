@@ -423,7 +423,7 @@ const App = () => {
   }, []);
 
   return (
-    <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: '#f5f5f5' }}>
+    <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', overflow: 'hidden' }}>
       <div style={{ 
         background: "#01321e", 
         color: 'white', 
@@ -451,8 +451,17 @@ const App = () => {
         </div>
         <div style={{ 
           display: 'flex', 
-          alignItems: 'center'
+          alignItems: 'center',
+          gap: '30px'
         }}>
+          <img 
+            src="/Images/1019px-NSF_logo.png" 
+            alt="NSF Logo" 
+            style={{ 
+              height: '65px', 
+              width: 'auto'
+            }} 
+          />
           <img 
             src="/Images/Miami_Hurricanes_logo.svg.png" 
             alt="Miami Hurricanes Logo" 
@@ -464,7 +473,7 @@ const App = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', height: 'calc(100vh - 120px)' }}>
+      <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
         <div style={{ width: '350px', background: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.1)', padding: '20px', overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '30px' }}>
             <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
@@ -514,8 +523,8 @@ const App = () => {
           </div>
         </div>
 
-        <div style={{ flex: 1, position: 'relative' }}>
-          <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />
+        <div style={{ flex: 1, position: 'relative', height: '100%' }}>
+          <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
           
           {loading && (
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(255, 255, 255, 0.9)', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 1000 }}>
