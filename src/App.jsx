@@ -192,7 +192,7 @@ const App = () => {
     });
 
     map.current.flyTo({
-      center: [-80.2, 25.8],
+      center: [-80.6327, 25.5516],
       zoom: 11,
       duration: 1500
     });
@@ -281,7 +281,7 @@ const App = () => {
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/light-v11',
-      center: [-80.2, 25.8],
+      center: [-80.6327, 25.5516],
       zoom: 11
     });
 
@@ -406,9 +406,44 @@ const App = () => {
 
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: '#f5f5f5' }}>
-      <div style={{ background: 'linear-gradient(135deg, #2c3e50 0%, #3498db 100%)', color: 'white', padding: '20px', textAlign: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-        <h1 style={{ fontSize: '2.5em', marginBottom: '10px', fontWeight: 300 }}>Miami-Dade Climate Resilience Projects</h1>
-        <p style={{ fontSize: '1.2em', opacity: 0.9 }}>Interactive Dashboard for Infrastructure and Adaptation Initiatives</p>
+      <div style={{ 
+        background: "#01321e", 
+        color: 'white', 
+        padding: '10px 30px', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)' 
+      }}>
+        <div>
+          <h1 style={{ 
+            fontSize: '1.8em', 
+            margin: '0', 
+            fontWeight: 300,
+            fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+            letterSpacing: '0.5px'
+          }}>SCALE-R Dashboard</h1>
+          <p style={{ 
+            fontSize: '0.9em', 
+            margin: '3px 0 0 0', 
+            opacity: 0.8,
+            fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+            fontWeight: 300
+          }}>Miami-Dade Climate Resilience Projects</p>
+        </div>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center'
+        }}>
+          <img 
+            src="/Images/Miami_Hurricanes_logo.svg.png" 
+            alt="Miami Hurricanes Logo" 
+            style={{ 
+              height: '45px', 
+              width: 'auto'
+            }} 
+          />
+        </div>
       </div>
 
       <div style={{ display: 'flex', height: 'calc(100vh - 120px)' }}>
