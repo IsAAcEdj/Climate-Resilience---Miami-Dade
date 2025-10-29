@@ -1,21 +1,21 @@
-# Miami-Dade Climate Resilience Projects Dashboard
+# Miami‑Dade Climate Resilience Dashboard
 
-An interactive React + Vite web app visualizing climate resilience and infrastructure projects in Miami-Dade County using Mapbox GL JS.
+A fast, map‑centric app to explore climate resilience and infrastructure projects across Miami‑Dade.
 
-## Features
+## What this tool helps you do
+- See where projects are and what they focus on (type, category, hazard focus, city)
+- Compare investment scale quickly (marker color/size encodes type and cost)
+- Drill into any project with a clean, readable popup
+- Navigate districts and reset views effortlessly
 
-- **Interactive Map** (Mapbox GL JS)
-- **Project Tooltip** with a clean two‑column grid layout (name, type, category, focus, city, status, cost, description)
-- **Visual encoding**: color by type, size by estimated cost
-- **Sidebar** with quick stats and filters
-- **District polygons** and view controls
+## Technologies
+- React (UI)
+- Vite (dev server/build, HMR)
+- Mapbox GL JS (interactive map, markers, popups)
+- GeoJSON (project and district data)
 
-## Getting Started (Development)
-
-Prerequisites:
-- Node.js 18+
-
-Install dependencies (first time only):
+## Run locally
+Prereq: Node.js 18+
 
 ```bash
 npm install
@@ -27,7 +27,7 @@ Run the dev server:
 npx vite
 ```
 
-Then open the Local URL printed in the terminal (typically `http://localhost:5173`). Vite supports hot-reload; edits in `src/` update immediately.
+Open the URL shown (typically `http://localhost:5173`). If 5173 is busy, Vite picks the next port.
 
 Build for production:
 
@@ -41,49 +41,42 @@ Preview the production build:
 npx vite preview
 ```
 
-## App Structure
-
-- Entry: `index.html`, `src/main.jsx`
-- Root component: `src/App.jsx`
-- Styles: `src/index.css`
-- Static assets and data: `public/`
-
-Key UI areas in `src/App.jsx`:
-- Header logos container (UM + NSF): search for `Miami_Hurricanes_logo.svg.png`
-- Sidebar container: a `<div>` with `width: '350px'`
-- Map container: `<div ref={mapContainer} style={{ width: '100%', height: '100%' }} />`
-- Tooltip HTML: `createPopupContent(feature)` function
+## Key code (for quick edits)
+- Sidebar width/content: `src/App.jsx` (left panel `width: '350px'`)
+- Logos and spacing: header `<img>` elements (container `gap`)
+- Popups: `createPopupContent(...)` and React portal `MapboxPopup` in `src/App.jsx`
 
 ## Data
+- Projects: `public/project_inventory_database.geojson`
+- Sample: `public/project_inventory_database_Sample.geojson`
+- Districts: `public/miami_cities.geojson`
 
-- Primary dataset used by the map is served from `public/project_inventory_database.geojson`.
-- A sample dataset is available at `public/project_inventory_database_Sample.geojson`.
-- District polygons are loaded from `public/miami_cities.geojson`.
-
-## Mapbox Token
-
-The Mapbox access token is set in `src/App.jsx`:
-
-```js
-mapboxgl.accessToken = '...';
-```
-
-Replace with your own token for deployments.
-
-## Common Tasks
-
-- Adjust logo spacing: edit the header container `gap` style near the logo `<img>` tags.
-- Resize logos: change the inline `height` on the respective `<img>` elements.
-- Sidebar width: change `width: '350px'` on the sidebar container.
-- Tooltip layout: edit `createPopupContent` to adjust the grid labels/values or add fields.
+Mapbox token is set in `src/App.jsx` (`mapboxgl.accessToken = '...'`). Replace for deployments.
 
 ## Troubleshooting
+- Not seeing changes? Ensure Vite is running, use the printed port, and hard refresh.
+- Popup close button position can be adjusted via `.mapboxgl-popup-close-button` styles in `src/App.jsx`.
 
-- Changes not appearing:
-  - Ensure the Vite server is running (`npx vite`) and you’re on the correct port.
-  - Hard refresh (Cmd+Shift+R / Ctrl+F5) or open an incognito window.
-- Multiple ports (5173, 5174, …): only one Vite server should be open in the browser.
-- HMR not triggering: verify your editor is saving the file and watch for `[vite] hmr update` logs.
+## Git: Commit and Push
+
+```bash
+git add -A
+git commit -m "Describe your changes"
+git push origin main
+```
+
+If HTTPS prompts fail on macOS, set Keychain helper:
+
+```bash
+git config --global credential.helper osxkeychain
+```
+
+Or switch to SSH:
+
+```bash
+git remote set-url origin git@github.com:IsAAcEdj/Climate-Resilience---Miami-Dade.git
+git push origin main
+```
 
 ## Browser Compatibility
 
