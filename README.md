@@ -1,61 +1,94 @@
 # Miami-Dade Climate Resilience Projects Dashboard
 
-An interactive web dashboard for visualizing climate resilience and infrastructure projects in Miami-Dade County.
+An interactive React + Vite web app visualizing climate resilience and infrastructure projects in Miami-Dade County using Mapbox GL JS.
 
 ## Features
 
-- **Interactive Map**: Visualize all 17 climate resilience projects on a Mapbox-powered map
-- **Project Details**: Click on any marker to see detailed project information including:
-  - Project name and type
-  - Category and disaster focus
-  - City and implementing agency
-  - Project status and estimated cost
-  - Brief description
-- **Visual Indicators**: 
-  - Color-coded markers by project type (Green vs Grey Infrastructure)
-  - Marker size based on project cost
-  - Legend for easy interpretation
-- **Statistics Panel**: Overview of total projects, investment, and completion status
+- **Interactive Map** (Mapbox GL JS)
+- **Project Tooltip** with a clean two‑column grid layout (name, type, category, focus, city, status, cost, description)
+- **Visual encoding**: color by type, size by estimated cost
+- **Sidebar** with quick stats and filters
+- **District polygons** and view controls
 
-## How to Use
+## Getting Started (Development)
 
-1. **Open the Dashboard**: Simply open `dashboard.html` in your web browser
-2. **Navigate the Map**: 
-   - Zoom in/out using mouse wheel or +/- buttons
-   - Pan by clicking and dragging
-   - Use fullscreen mode for better viewing
-3. **View Project Details**: Click on any project marker to see a popup with detailed information
-4. **Understand the Legend**: 
-   - Red markers: Green Infrastructure projects
-   - Blue markers: Grey Infrastructure projects
-   - Larger markers: Higher cost projects
+Prerequisites:
+- Node.js 18+
 
-## Project Data
+Install dependencies (first time only):
 
-The dashboard displays 17 climate resilience projects including:
+```bash
+npm install
+```
 
-- **Miami Beach Projects** (6): Including Maurice Gibb Memorial Park and Miami Beach Convention Center
-- **Cutler Bay Projects** (11): Primarily drainage improvements across various neighborhoods
+Run the dev server:
 
-**Total Investment**: Over $1 billion across all projects
-**Focus Areas**: Primarily flooding and sea level rise mitigation
-**Project Types**: Mix of green infrastructure and traditional grey infrastructure solutions
+```bash
+npx vite
+```
 
-## Technical Details
+Then open the Local URL printed in the terminal (typically `http://localhost:5173`). Vite supports hot-reload; edits in `src/` update immediately.
 
-- Built with HTML5, CSS3, and JavaScript
-- Uses Mapbox GL JS for interactive mapping
-- Loads GeoJSON data from `project_inventory_database.geojson`
-- Responsive design that works on desktop and mobile devices
+Build for production:
+
+```bash
+npx vite build
+```
+
+Preview the production build:
+
+```bash
+npx vite preview
+```
+
+## App Structure
+
+- Entry: `index.html`, `src/main.jsx`
+- Root component: `src/App.jsx`
+- Styles: `src/index.css`
+- Static assets and data: `public/`
+
+Key UI areas in `src/App.jsx`:
+- Header logos container (UM + NSF): search for `Miami_Hurricanes_logo.svg.png`
+- Sidebar container: a `<div>` with `width: '350px'`
+- Map container: `<div ref={mapContainer} style={{ width: '100%', height: '100%' }} />`
+- Tooltip HTML: `createPopupContent(feature)` function
+
+## Data
+
+- Primary dataset used by the map is served from `public/project_inventory_database.geojson`.
+- A sample dataset is available at `public/project_inventory_database_Sample.geojson`.
+- District polygons are loaded from `public/miami_cities.geojson`.
+
+## Mapbox Token
+
+The Mapbox access token is set in `src/App.jsx`:
+
+```js
+mapboxgl.accessToken = '...';
+```
+
+Replace with your own token for deployments.
+
+## Common Tasks
+
+- Adjust logo spacing: edit the header container `gap` style near the logo `<img>` tags.
+- Resize logos: change the inline `height` on the respective `<img>` elements.
+- Sidebar width: change `width: '350px'` on the sidebar container.
+- Tooltip layout: edit `createPopupContent` to adjust the grid labels/values or add fields.
+
+## Troubleshooting
+
+- Changes not appearing:
+  - Ensure the Vite server is running (`npx vite`) and you’re on the correct port.
+  - Hard refresh (Cmd+Shift+R / Ctrl+F5) or open an incognito window.
+- Multiple ports (5173, 5174, …): only one Vite server should be open in the browser.
+- HMR not triggering: verify your editor is saving the file and watch for `[vite] hmr update` logs.
 
 ## Browser Compatibility
 
-Works best on modern browsers including:
-- Chrome (recommended)
-- Firefox
-- Safari
-- Edge
+Modern browsers: Chrome, Firefox, Safari, Edge.
 
-## Data Source
+## License
 
-Project data is sourced from the `project_inventory_database.geojson` file, which contains detailed information about each climate resilience project including location coordinates, project details, costs, and timelines.
+Internal project. Licensing TBD.

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
 
 const App = () => {
@@ -11,6 +12,7 @@ const App = () => {
   const [currentDistrict, setCurrentDistrict] = useState(null);
   const [allProjectsData, setAllProjectsData] = useState(null);
   const [isSatelliteView, setIsSatelliteView] = useState(false);
+  const [activeFeature, setActiveFeature] = useState(null);
 
   // Define district boundaries
   
@@ -384,18 +386,15 @@ const App = () => {
             const coordinates = feature.geometry.coordinates;
             const properties = feature.properties;
             
-            const popup = new mapboxgl.Popup({
-              offset: 25,
-              closeButton: true,
-              closeOnClick: false
-            }).setHTML(createPopupContent(feature));
-
             const marker = new mapboxgl.Marker({
               color: getMarkerColor(properties['Type']),
               scale: getMarkerSize(properties['Esimated Project Cost']) / 10
             })
-            .setLngLat(coordinates)
-            .setPopup(popup);
+          .setLngLat(coordinates);
+
+          marker.getElement().addEventListener('click', () => {
+            setActiveFeature(feature);
+          });
             
             marker.addTo(map.current);
             marker.feature = feature;
@@ -527,6 +526,9 @@ const App = () => {
 
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
           <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
+          {map.current && (
+            <MapboxPopup map={map.current} activeFeature={activeFeature} />
+          )}
           
           {loading && (
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(255, 255, 255, 0.9)', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 1000 }}>
@@ -642,6 +644,21 @@ const App = () => {
         .mapboxgl-popup-content {
           border-radius: 10px !important;
           box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
+          padding-right: 30px; /* space for close button */
+        }
+        .mapboxgl-popup-close-button {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          transform: none; /* ensure it sits inside */
+          background: #ffffff;
+          border-radius: 4px;
+          width: 22px;
+          height: 22px;
+          line-height: 20px;
+          text-align: center;
+          border: 1px solid #e1e5ea;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.08);
         }
       `}</style>
     </div>
@@ -649,3 +666,84 @@ const App = () => {
 };
 
 export default App;
+
+// React-based Mapbox Popup using a portal to render rich content
+const MapboxPopup = ({ map, activeFeature }) => {
+  const popupRef = useRef(null);
+  const contentRef = useRef(typeof document !== 'undefined' ? document.createElement('div') : null);
+
+  // Create popup instance on mount
+  useEffect(() => {
+    if (!map) return;
+    popupRef.current = new mapboxgl.Popup({ closeOnClick: false, offset: 20 });
+    return () => {
+      if (popupRef.current) popupRef.current.remove();
+    };
+  }, [map]);
+
+  // Update popup when activeFeature changes
+  useEffect(() => {
+    if (!map || !popupRef.current) return;
+    if (!activeFeature) {
+      popupRef.current.remove();
+      return;
+    }
+
+    const coords = activeFeature.geometry?.coordinates;
+    if (!coords) return;
+
+    popupRef.current
+      .setLngLat(coords)
+      .setHTML(contentRef.current.outerHTML)
+      .addTo(map);
+  }, [map, activeFeature]);
+
+  if (!contentRef.current) return null;
+
+  const props = activeFeature?.properties || {};
+  return (
+    <>{createPortal(
+      <div className="portal-content" style={{ maxWidth: 360 }}>
+        <div style={{ fontSize: '1.05em', fontWeight: 700, color: '#2c3e50', marginBottom: 10 }}>
+          {props['Project Name'] || 'Project'}
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 6px', fontSize: '0.9em' }}>
+          <tbody>
+            <tr>
+              <td style={{ color: '#34495e', fontWeight: 600, width: 110 }}>Type</td>
+              <td style={{ color: '#2c3e50' }}>{props['Type'] || '—'}</td>
+            </tr>
+            <tr>
+              <td style={{ color: '#34495e', fontWeight: 600 }}>Category</td>
+              <td style={{ color: '#2c3e50' }}>{props['Categories'] || '—'}</td>
+            </tr>
+            <tr>
+              <td style={{ color: '#34495e', fontWeight: 600 }}>Focus</td>
+              <td style={{ color: '#2c3e50' }}>{props['Disaster Focus'] || '—'}</td>
+            </tr>
+            <tr>
+              <td style={{ color: '#34495e', fontWeight: 600 }}>City</td>
+              <td style={{ color: '#2c3e50' }}>{props['City'] || '—'}</td>
+            </tr>
+            <tr>
+              <td style={{ color: '#34495e', fontWeight: 600 }}>Status</td>
+              <td style={{ color: (props['Project Status'] || '').toLowerCase() === 'completed' ? '#27ae60' : '#f39c12', fontWeight: 700 }}>
+                {props['Project Status'] || 'Unknown'}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ color: '#34495e', fontWeight: 600 }}>Cost</td>
+              <td style={{ color: '#27ae60', fontWeight: 700 }}>{props['Esimated Project Cost'] || 'Not disclosed'}</td>
+            </tr>
+          </tbody>
+        </table>
+        {props['Brief Description of the Project'] && (
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #ecf0f1', color: '#7f8c8d', fontSize: '0.85em', lineHeight: 1.4 }}>
+            {props['Brief Description of the Project']}
+          </div>
+        )}
+      </div>,
+      contentRef.current
+    )}</>
+  );
+};
