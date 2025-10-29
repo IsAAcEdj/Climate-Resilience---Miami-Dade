@@ -43,8 +43,8 @@ const App = () => {
     const status = props['Project Status'] || 'Unknown';
     
     return `
-      <div style="padding: 15px; min-width: 250px;">
-        <div style="font-size: 1.2em; font-weight: bold; color: #2c3e50; margin-bottom: 10px; line-height: 1.3;">
+      <div style="padding: 15px; min-width: 280px;">
+        <div style="font-size: 1.2em; font-weight: bold; color: #2c3e50; margin-bottom: 12px; line-height: 1.3;">
           ${props['Project Name']}
         </div>
         <div style="margin-bottom: 8px; font-size: 0.9em;">
@@ -77,6 +77,8 @@ const App = () => {
       </div>
     `;
   };
+
+  
 
   // Check if point is within district
   const isPointInDistrict = (point, districtCoords) => {
@@ -474,7 +476,7 @@ const App = () => {
       </div>
 
       <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-        <div style={{ width: '350px', background: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.1)', padding: '20px', overflowY: 'auto' }}>
+        {/* <div style={{ width: '350px', background: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.1)', padding: '20px', overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '30px' }}>
             <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
               <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>17</div>
@@ -521,7 +523,7 @@ const App = () => {
               <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Critical Infrastructure</div>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
           <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
