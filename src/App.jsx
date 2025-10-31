@@ -256,7 +256,7 @@ const App = () => {
     
     const loadDistricts = async () => {
     try {
-      const response = await fetch('miami_cities.geojson');
+      const response = await fetch('/miami_cities.geojson');
       const geojson = await response.json();
 
       const districts = {};
@@ -367,7 +367,7 @@ const App = () => {
 
         // Try to load GeoJSON data
         try {
-          const response = await fetch('project_inventory_database.geojson');
+          const response = await fetch('/project_inventory_database.geojson');
           
           if (!response.ok) {
             throw new Error(`Failed to load project data: ${response.status}`);
