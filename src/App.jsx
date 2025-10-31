@@ -646,6 +646,10 @@ const App = () => {
           box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
           padding-right: 30px; /* space for close button */
         }
+        /* Ensure popups render above markers */
+        .mapboxgl-popup {
+          z-index: 10000 !important;
+        }
         .mapboxgl-popup-close-button {
           position: absolute;
           top: 6px;
