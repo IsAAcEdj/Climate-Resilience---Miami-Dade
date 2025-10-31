@@ -537,7 +537,7 @@ const App = () => {
             </div>
           )}
 
-          <div style={{ position: 'absolute', top: '20px', right: '20px', background: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', zIndex: 1000, minWidth: '200px' }}>
+          <div style={{ position: 'absolute', top: '150px', right: '10px', background: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', zIndex: 1000, minWidth: '200px' }}>
             <h4 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '1em' }}>Special Districts</h4>
             {/* <button
               onClick={() => zoomToDistrict('cutler-bay')}
