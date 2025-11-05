@@ -41,7 +41,7 @@ const App = () => {
   // Create popup content
   const createPopupContent = (feature) => {
     const props = feature.properties;
-    const cost = props['Esimated Project Cost'] || 'Not disclosed';
+    const cost = props['Estimated Project Cost'] || 'Not disclosed';
     const status = props['Project Status'] || 'Unknown';
     
     return `
