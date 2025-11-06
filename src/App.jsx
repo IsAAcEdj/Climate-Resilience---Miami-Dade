@@ -316,6 +316,7 @@ const App = () => {
 
     map.current.on('load', async () => {
       try {
+          console.log('Value:', props['Estimated Project Cost']);
         // Add district polygons
         Object.keys(districtsRef.current).forEach(districtId => {
           const district = districtsRef.current[districtId];
