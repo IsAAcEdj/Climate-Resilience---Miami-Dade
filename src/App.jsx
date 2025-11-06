@@ -43,7 +43,7 @@ const App = () => {
     const props = feature.properties;
     const cost = props['Estimated Project Cost'] ?? 'Not disclosed';
     const status = props['Project Status'] || 'Unknown';
-    
+    console.log('Value:', props['Estimated Project Cost']);
     return `
       <div style="padding: 15px; min-width: 280px;">
         <div style="font-size: 1.2em; font-weight: bold; color: #2c3e50; margin-bottom: 12px; line-height: 1.3;">
@@ -316,7 +316,7 @@ const App = () => {
 
     map.current.on('load', async () => {
       try {
-          console.log('Value:', props['Estimated Project Cost']);
+
         // Add district polygons
         Object.keys(districtsRef.current).forEach(districtId => {
           const district = districtsRef.current[districtId];
