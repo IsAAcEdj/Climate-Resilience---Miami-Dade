@@ -473,6 +473,7 @@ const App = () => {
           />
         </div>
       </div>
+      
 
       <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
         {/* <div style={{ width: '350px', background: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.1)', padding: '20px', overflowY: 'auto' }}>
@@ -523,6 +524,7 @@ const App = () => {
             </div>
           </div>
         </div> */}
+        
 
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
           <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
@@ -635,7 +637,80 @@ const App = () => {
           </div>
         </div>
       </div>
-
+  <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
+        <div style={{ width: '300px', background: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.1)', padding: '20px', overflowY: 'auto' }}>
+          <h3 style={{ color: '#2c3e50', marginBottom: '15px', fontSize: '1.2em', fontWeight: 600 }}>Miami-Dade Cities</h3>
+          <div style={{ fontSize: '0.85em', color: '#7f8c8d', marginBottom: '15px' }}>
+            Select a city to zoom in
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {Object.entries(districtsRef.current)
+              .sort((a, b) => a[1].name.localeCompare(b[1].name))
+              .map(([districtId, district]) => (
+                <button
+                  key={districtId}
+                  onClick={() => zoomToDistrict(districtId)}
+                  style={{
+                    padding: '12px 15px',
+                    background: currentDistrict === districtId 
+                      ? 'linear-gradient(135deg, #27ae60, #229954)' 
+                      : 'linear-gradient(135deg, #ecf0f1, #dfe6e9)',
+                    color: currentDistrict === districtId ? 'white' : '#2c3e50',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '0.9em',
+                    fontWeight: currentDistrict === districtId ? 600 : 400,
+                    transition: 'all 0.3s',
+                    textAlign: 'left',
+                    boxShadow: currentDistrict === districtId 
+                      ? '0 2px 8px rgba(39, 174, 96, 0.3)' 
+                      : '0 1px 3px rgba(0,0,0,0.1)',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (currentDistrict !== districtId) {
+                      e.target.style.background = 'linear-gradient(135deg, #dfe6e9, #cfd9df)';
+                      e.target.style.transform = 'translateX(3px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (currentDistrict !== districtId) {
+                      e.target.style.background = 'linear-gradient(135deg, #ecf0f1, #dfe6e9)';
+                      e.target.style.transform = 'translateX(0)';
+                    }
+                  }}
+                >
+                  {district.name}
+                </button>
+              ))}
+          </div>
+          <button
+            onClick={resetView}
+            style={{
+              width: '100%',
+              marginTop: '20px',
+              padding: '12px 15px',
+              background: 'linear-gradient(135deg, #95a5a6, #7f8c8d)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.9em',
+              fontWeight: 600,
+              transition: 'all 0.3s',
+              boxShadow: '0 2px 8px rgba(149, 165, 166, 0.3)',
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'linear-gradient(135deg, #7f8c8d, #6c7a7d)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'linear-gradient(135deg, #95a5a6, #7f8c8d)';
+            }}
+          >
+            Reset View
+          </button>
+        </div>
+      </div>
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
