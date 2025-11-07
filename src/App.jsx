@@ -697,7 +697,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Cost</td>
-              <td style={{ color: '#27ae60', fontWeight: 700 }}>{
+              <td style={{ color: (props['Estimated Project Cost'] == null) ?'#f39c12' : '#27ae60', fontWeight: 700 }}>{
                   (props['Estimated Project Cost'] == null) ? 'Not Disclosed' : "$" + props['Estimated Project Cost']}</td>
             </tr>
           </tbody>
