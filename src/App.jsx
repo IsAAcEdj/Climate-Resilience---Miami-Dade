@@ -70,7 +70,7 @@ const App = () => {
         </div>
         <div style="margin-bottom: 8px; font-size: 0.9em;">
           <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Cost:</span>
-          <span style="color: #27ae60; font-weight: bold;">${cost}</span>
+          <span style="color: #27ae60; font-weight: bold;">${props['Estimated Project Cost'] || 'Not disclosed'}</span>
         </div>
         <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ecf0f1; font-size: 0.85em; color: #7f8c8d; line-height: 1.4;">
           ${props['Brief Description of the Project']}
@@ -315,7 +315,6 @@ const App = () => {
 
     map.current.on('load', async () => {
       try {
-
         // Add district polygons
         Object.keys(districtsRef.current).forEach(districtId => {
           const district = districtsRef.current[districtId];
