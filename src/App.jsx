@@ -38,47 +38,6 @@ const App = () => {
     return 8;
   };
 
-  // Create popup content
-  const createPopupContent = (feature) => {
-    const props = feature.properties;
-    const cost = props['Estimated Project Cost'] || 'Not disclosed';
-    const status = props['Project Status'] || 'Unknown';
-    
-    return `
-      <div style="padding: 15px; min-width: 280px;">
-        <div style="font-size: 1.2em; font-weight: bold; color: #2c3e50; margin-bottom: 12px; line-height: 1.3;">
-          ${props['Project Name']}
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Type:</span>
-          <span style="color: #2c3e50;">${props['Type']}</span>
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Category:</span>
-          <span style="color: #2c3e50;">${props['Categories']}</span>
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Focus:</span>
-          <span style="color: #2c3e50;">${props['Disaster Focus']}</span>
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">City:</span>
-          <span style="color: #2c3e50;">${props['City']}</span>
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Status:</span>
-          <span style="color: ${status.toLowerCase() === 'completed' ? '#27ae60' : '#f39c12'}; font-weight: bold;">${status}</span>
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Cost:</span>
-          <span style="color: #27ae60; font-weight: bold;">${cost}</span>
-        </div>
-        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ecf0f1; font-size: 0.85em; color: #7f8c8d; line-height: 1.4;">
-          ${props['Brief Description of the Project']}
-        </div>
-      </div>
-    `;
-  };
 
   
 
@@ -737,7 +696,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Cost</td>
-              <td style={{ color: '#27ae60', fontWeight: 700 }}>{props['Esimated Project Cost'] || 'Not disclosed'}</td>
+              <td style={{ color: '#27ae60', fontWeight: 700 }}>{props['Estimated Project Cost'] || 'Not disclosed'}</td>
             </tr>
           </tbody>
         </table>
