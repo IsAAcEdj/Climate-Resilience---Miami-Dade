@@ -393,6 +393,7 @@ const App = () => {
 
           marker.getElement().addEventListener('click', () => {
             setActiveFeature(feature);
+            console.log(feature.properties['Estimated Project Cost']);
           });
             
             marker.addTo(map.current);
