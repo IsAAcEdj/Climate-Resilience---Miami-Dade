@@ -395,7 +395,7 @@ const App = () => {
       }}>
         <div>
           <h1 style={{ 
-            fontSize: '1.8em', 
+            fontSize: '2em', 
             margin: '0', 
             fontWeight: 300,
             fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
@@ -418,7 +418,7 @@ const App = () => {
             src="/Images/1019px-NSF_logo.png" 
             alt="NSF Logo" 
             style={{ 
-              height: '65px', 
+              height: '75px', 
               width: 'auto'
             }} 
           />
@@ -426,7 +426,7 @@ const App = () => {
             src="/Images/Miami_Hurricanes_logo.svg.png" 
             alt="Miami Hurricanes Logo" 
             style={{ 
-              height: '45px', 
+              height: '50px', 
               width: 'auto'
             }} 
           />
