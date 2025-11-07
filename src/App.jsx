@@ -664,6 +664,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
   if (!contentRef.current) return null;
 
   const props = activeFeature?.properties || {};
+
   return (
     <>{createPortal(
       <div className="portal-content" style={{ maxWidth: 360 }}>
@@ -696,7 +697,8 @@ const MapboxPopup = ({ map, activeFeature }) => {
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Cost</td>
-              <td style={{ color: '#27ae60', fontWeight: 700 }}>{"$" + props['Estimated Project Cost'] ?? 'Not disclosed'}</td>
+              <td style={{ color: '#27ae60', fontWeight: 700 }}>{
+                  (props['Estimated Project Cost'] == null) ? 'Not Disclosed' : "$" + props['Estimated Project Cost']}</td>
             </tr>
           </tbody>
         </table>
