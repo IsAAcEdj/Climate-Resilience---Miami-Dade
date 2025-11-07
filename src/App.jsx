@@ -41,7 +41,7 @@ const App = () => {
   // Create popup content
   const createPopupContent = (feature) => {
     const props = feature.properties;
-    const cost = feature.properties['Estimated Project Cost'];
+    const cost = feature.properties['Estimated Project Cost'] ?? 'Not disclosed';
     const status = feature.properties['Project Status'] || 'Unknown';
     return `
       <div style="padding: 15px; min-width: 280px;">
