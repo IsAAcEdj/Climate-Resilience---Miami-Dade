@@ -1,11 +1,99 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
+
+const parseNumericValue = (value) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const cleaned = String(value).replace(/[^0-9eE.+-]/g, '');
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toWgs84Coordinate = ([x, y]) => {
+  const originShift = 20037508.34;
+  const lon = (x / originShift) * 180;
+  let lat = (y / originShift) * 180;
+  lat = (180 / Math.PI) * (2 * Math.atan(Math.exp((lat * Math.PI) / 180)) - Math.PI / 2);
+  return [lon, lat];
+};
+
+const transformToWgs84 = (coords) => {
+  if (!Array.isArray(coords)) return coords;
+  if (typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+    return toWgs84Coordinate(coords);
+  }
+  return coords.map(transformToWgs84);
+};
+
+const walkCoordinates = (geometry, callback) => {
+  if (!geometry || !geometry.coordinates) return;
+  const traverse = (coords) => {
+    if (!Array.isArray(coords)) return;
+    if (typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+      callback(coords);
+      return;
+    }
+    coords.forEach(traverse);
+  };
+  traverse(geometry.coordinates);
+};
+
+const reprojectFeatureCollectionIfNeeded = (featureCollection) => {
+  if (!featureCollection?.features?.length) return featureCollection;
+  let firstCoord = null;
+  for (const feature of featureCollection.features) {
+    if (!feature?.geometry) continue;
+    walkCoordinates(feature.geometry, (coord) => {
+      if (!firstCoord) firstCoord = coord;
+    });
+    if (firstCoord) break;
+  }
+  if (!firstCoord) return featureCollection;
+  const needsReprojection = Math.abs(firstCoord[0]) > 180 || Math.abs(firstCoord[1]) > 90;
+  if (!needsReprojection) return featureCollection;
+  console.info('[Census] Reprojecting GeoJSON from EPSG:3857 to EPSG:4326');
+  return {
+    ...featureCollection,
+    features: featureCollection.features.map((feature) => {
+      if (!feature?.geometry) return feature;
+      return {
+        ...feature,
+        geometry: {
+          ...feature.geometry,
+          coordinates: transformToWgs84(feature.geometry.coordinates)
+        }
+      };
+    })
+  };
+};
+
+const getRangeStats = (values) => {
+  if (!values.length) return { min: null, mid: null, max: null };
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const mid = min + (max - min) / 2;
+  return { min, mid, max };
+};
+
+const formatWithCommas = (value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat('en-US').format(value);
+};
+
+const formatRiskValue = (value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  return value.toFixed(2);
+};
 
 const App = () => {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const districtsRef = useRef({});
+  const censusDataRef = useRef(null);
+  const hoveredCensusIdRef = useRef(null);
+  const censusStatsRef = useRef(null);
+  const censusViewRef = useRef('risk');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [allMarkers, setAllMarkers] = useState([]);
@@ -13,6 +101,21 @@ const App = () => {
   const [allProjectsData, setAllProjectsData] = useState(null);
   const [isSatelliteView, setIsSatelliteView] = useState(false);
   const [activeFeature, setActiveFeature] = useState(null);
+  const [censusStats, setCensusStats] = useState(null);
+  const [censusLayersReady, setCensusLayersReady] = useState(false);
+  const [activeCensusView, setActiveCensusView] = useState('risk');
+  const [censusVisible, setCensusVisible] = useState(true);
+  const censusEventsBoundRef = useRef(false);
+  const censusVisibleRef = useRef(true);
+
+  const handleCensusViewChange = (view) => {
+    censusViewRef.current = view;
+    setActiveCensusView(view);
+  };
+
+  const handleCensusVisibilityToggle = () => {
+    setCensusVisible((prev) => !prev);
+  };
 
   // Define district boundaries
   
@@ -113,6 +216,7 @@ const App = () => {
     if (!map.current) return;
     
     setCurrentDistrict(null);
+    handleCensusViewChange('risk');
 
     Object.keys(districtsRef.current).forEach(id => {
       map.current.setPaintProperty(`${id}-fill`, 'fill-opacity', 0.1);
@@ -132,6 +236,223 @@ const App = () => {
       duration: 1500
     });
   };
+
+
+
+
+  const addCensusSourceAndLayers = useCallback(() => {
+    if (!map.current || !censusDataRef.current) return;
+
+    const stats = censusStatsRef.current;
+    const view = censusViewRef.current;
+
+    if (!stats) return;
+
+    const riskColors = { min: '#4CAF50', mid: '#FFC107', max: '#F44336', single: '#FFC107' };
+    const populationColors = { min: '#ffffcc', mid: '#41b6c4', max: '#253494', single: '#41b6c4' };
+
+    const buildColorExpression = (rangeStats, propertyName, palette) => {
+      if (!rangeStats || rangeStats.min === null || rangeStats.max === null) {
+        return [
+          'case',
+          ['==', ['typeof', ['get', propertyName]], 'number'],
+          palette.single,
+          '#9e9e9e'
+        ];
+      }
+      if (rangeStats.min === rangeStats.max) {
+        return [
+          'case',
+          ['==', ['typeof', ['get', propertyName]], 'number'],
+          palette.single,
+          '#9e9e9e'
+        ];
+      }
+      return [
+        'case',
+        ['==', ['typeof', ['get', propertyName]], 'number'],
+        [
+          'interpolate',
+          ['linear'],
+          ['get', propertyName],
+          rangeStats.min, palette.min,
+          rangeStats.mid, palette.mid,
+          rangeStats.max, palette.max
+        ],
+        '#9e9e9e'
+      ];
+    };
+
+    const riskColorExpression = buildColorExpression(stats.risk, '__riskIndex', riskColors);
+    const populationColorExpression = buildColorExpression(stats.population, '__population', populationColors);
+    const isVisible = censusVisibleRef.current;
+    const riskVisibility = view === 'risk' && isVisible ? 'visible' : 'none';
+    const populationVisibility = view === 'population' && isVisible ? 'visible' : 'none';
+    const outlineVisibility = isVisible ? 'visible' : 'none';
+
+    if (map.current.getSource('census-tracts')) {
+      map.current.getSource('census-tracts').setData(censusDataRef.current);
+    } else {
+      map.current.addSource('census-tracts', {
+        type: 'geojson',
+        data: censusDataRef.current
+      });
+    }
+
+    if (!map.current.getLayer('census-tracts-risk')) {
+      map.current.addLayer({
+        id: 'census-tracts-risk',
+        type: 'fill',
+        source: 'census-tracts',
+        layout: {
+          visibility: riskVisibility
+        },
+        paint: {
+          'fill-color': riskColorExpression,
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.6,
+            0.35
+          ]
+        }
+      });
+    } else {
+      map.current.setPaintProperty('census-tracts-risk', 'fill-color', riskColorExpression);
+      map.current.setLayoutProperty('census-tracts-risk', 'visibility', riskVisibility);
+    }
+
+    if (!map.current.getLayer('census-tracts-population')) {
+      map.current.addLayer({
+        id: 'census-tracts-population',
+        type: 'fill',
+        source: 'census-tracts',
+        layout: {
+          visibility: populationVisibility
+        },
+        paint: {
+          'fill-color': populationColorExpression,
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.6,
+            0.35
+          ]
+        }
+      });
+    } else {
+      map.current.setPaintProperty('census-tracts-population', 'fill-color', populationColorExpression);
+      map.current.setLayoutProperty('census-tracts-population', 'visibility', populationVisibility);
+    }
+
+    if (!map.current.getLayer('census-tracts-outline')) {
+      map.current.addLayer({
+        id: 'census-tracts-outline',
+        type: 'line',
+        source: 'census-tracts',
+        layout: {
+          visibility: outlineVisibility
+        },
+        paint: {
+          'line-color': '#000000',
+          'line-width': 2,
+          'line-opacity': 0.8
+        }
+      });
+    } else {
+      map.current.setLayoutProperty('census-tracts-outline', 'visibility', outlineVisibility);
+    }
+
+    if (!censusEventsBoundRef.current) {
+      const censusLayerIds = ['census-tracts-risk', 'census-tracts-population'];
+
+      const handleHover = (e) => {
+        if (!map.current) return;
+        const feature = e.features && e.features[0];
+        if (!feature || feature.id === undefined || feature.id === null) return;
+
+        if (hoveredCensusIdRef.current !== null) {
+          map.current.setFeatureState(
+            { source: 'census-tracts', id: hoveredCensusIdRef.current },
+            { hover: false }
+          );
+        }
+
+        hoveredCensusIdRef.current = feature.id;
+        map.current.setFeatureState(
+          { source: 'census-tracts', id: hoveredCensusIdRef.current },
+          { hover: true }
+        );
+      };
+
+      const handleLeave = () => {
+        if (!map.current) return;
+        if (hoveredCensusIdRef.current !== null) {
+          map.current.setFeatureState(
+            { source: 'census-tracts', id: hoveredCensusIdRef.current },
+            { hover: false }
+          );
+        }
+        hoveredCensusIdRef.current = null;
+        map.current.getCanvas().style.cursor = '';
+      };
+
+      const handleClick = (e) => {
+        if (!map.current) return;
+        const feature = e.features && e.features[0];
+        if (!feature) return;
+        const props = feature.properties || {};
+        const tractName = props['L0Census_Tracts.NAME'] || 'Census Tract';
+        const tractId = props['L0Census_Tracts.GEOID'] || feature.id || 'N/A';
+        const riskRating = props['T_FEMA_National_Risk_Index_$_.FEMAIndexRating'] || 'Not Rated';
+        const riskIndexRaw = parseNumericValue(props['T_FEMA_National_Risk_Index_$_.FEMAIndex']);
+        const populationRaw = parseNumericValue(
+          props['T_CENSUS_Community_Resilience_Est$_.Total_population__excludes_adult_correctional_juvenile_facilitie']
+        );
+
+        const popupHtml = `
+          <div style="font-family: 'Inter', 'Segoe UI', sans-serif; min-width: 220px;">
+            <div style="font-size: 1.05em; font-weight: 700; color: #1b3a4b; margin-bottom: 4px;">${tractName}</div>
+            <div style="font-size: 0.85em; color: #546e7a; margin-bottom: 10px;">Tract ID: ${tractId}</div>
+            <hr style="border: none; border-top: 1px solid #e0e6ed; margin: 8px 0;" />
+            <div style="font-size: 0.9em; color: #1b3a4b; margin-bottom: 4px;">
+              <span style="font-weight: 600;">FEMA Risk Rating:</span>
+              <span style="margin-left: 6px;">${riskRating}</span>
+            </div>
+            <div style="font-size: 0.9em; color: #1b3a4b; margin-bottom: 12px;">
+              <span style="font-weight: 600;">FEMA Risk Index:</span>
+              <span style="margin-left: 6px;">${riskIndexRaw !== null ? riskIndexRaw.toFixed(2) : '—'}</span>
+            </div>
+            <hr style="border: none; border-top: 1px solid #e0e6ed; margin: 8px 0;" />
+            <div style="font-size: 0.9em; color: #1b3a4b;">
+              <span style="font-weight: 600;">Population:</span>
+              <span style="margin-left: 6px;">${populationRaw !== null ? formatWithCommas(Math.round(populationRaw)) : '—'}</span>
+            </div>
+          </div>
+        `;
+
+        new mapboxgl.Popup({ closeButton: true, closeOnClick: true })
+          .setLngLat(e.lngLat)
+          .setHTML(popupHtml)
+          .addTo(map.current);
+      };
+
+      censusLayerIds.forEach((layerId) => {
+        map.current.on('click', layerId, handleClick);
+        map.current.on('mouseenter', layerId, () => {
+          if (map.current) {
+            map.current.getCanvas().style.cursor = 'pointer';
+          }
+        });
+        map.current.on('mousemove', layerId, handleHover);
+        map.current.on('mouseleave', layerId, handleLeave);
+      });
+
+      censusEventsBoundRef.current = true;
+    }
+
+    setCensusLayersReady(true);
+  }, []);
 
   // Toggle between satellite and standard map
   const toggleMapStyle = () => {
@@ -202,6 +523,8 @@ const App = () => {
           marker.addTo(map.current);
         });
       }
+
+      addCensusSourceAndLayers();
     });
     
     map.current.setStyle(newStyle);
@@ -275,10 +598,9 @@ const App = () => {
 
     map.current.on('load', async () => {
       try {
-        // Add district polygons
         Object.keys(districtsRef.current).forEach(districtId => {
           const district = districtsRef.current[districtId];
-          
+
           map.current.addSource(districtId, {
             type: 'geojson',
             data: {
@@ -323,64 +645,210 @@ const App = () => {
             map.current.getCanvas().style.cursor = '';
           });
         });
-
-        // Try to load GeoJSON data
-        try {
-          const response = await fetch('/project_inventory_database.geojson');
-          
-          if (!response.ok) {
-            throw new Error(`Failed to load project data: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          setAllProjectsData(data);
-
-          map.current.addSource('projects', {
-            type: 'geojson',
-            data: data
-          });
-
-          const markers = [];
-          data.features.forEach(feature => {
-            const coordinates = feature.geometry.coordinates;
-            const properties = feature.properties;
-            
-            const marker = new mapboxgl.Marker({
-              color: getMarkerColor(properties['Type']),
-              scale: getMarkerSize(properties['Esimated Project Cost']) / 10
-            })
-          .setLngLat(coordinates);
-
-          marker.getElement().addEventListener('click', () => {
-            setActiveFeature(feature);
-          });
-            
-            marker.addTo(map.current);
-            marker.feature = feature;
-            markers.push(marker);
-          });
-
-          setAllMarkers(markers);
-
-          const bounds = new mapboxgl.LngLatBounds();
-          data.features.forEach(feature => {
-            bounds.extend(feature.geometry.coordinates);
-          });
-          map.current.fitBounds(bounds, { padding: 50 });
-
-          setLoading(false);
-        } catch (err) {
-          console.error('Error loading project data:', err);
-          setError('Unable to load project data. Please ensure the GeoJSON file is available or use a CORS proxy.');
-          setLoading(false);
-        }
       } catch (err) {
         console.error('Map initialization error:', err);
         setError('Error initializing map');
         setLoading(false);
       }
+
+      try {
+        const response = await fetch('/project_inventory_database.geojson');
+
+        if (!response.ok) {
+          throw new Error(`Failed to load project data: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setAllProjectsData(data);
+
+        map.current.addSource('projects', {
+          type: 'geojson',
+          data: data
+        });
+
+        const markers = [];
+        data.features.forEach(feature => {
+          const coordinates = feature.geometry.coordinates;
+          const properties = feature.properties;
+
+          const marker = new mapboxgl.Marker({
+            color: getMarkerColor(properties['Type']),
+            scale: getMarkerSize(properties['Esimated Project Cost']) / 10
+          })
+            .setLngLat(coordinates);
+
+          marker.getElement().addEventListener('click', () => {
+            setActiveFeature(feature);
+          });
+
+          marker.addTo(map.current);
+          marker.feature = feature;
+          markers.push(marker);
+        });
+
+        setAllMarkers(markers);
+
+        const bounds = new mapboxgl.LngLatBounds();
+        data.features.forEach(feature => {
+          bounds.extend(feature.geometry.coordinates);
+        });
+        if (!bounds.isEmpty()) {
+          map.current.fitBounds(bounds, { padding: 50 });
+        }
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Error loading project data:', err);
+        setError('Unable to load project data. Please ensure the GeoJSON file is available or use a CORS proxy.');
+        setLoading(false);
+      }
+
+      try {
+        const response = await fetch('/femaindex.geojson');
+        if (!response.ok) {
+          throw new Error(`Failed to load census tract data: ${response.status}`);
+        }
+
+        const rawGeojson = await response.json();
+        const reprojected = reprojectFeatureCollectionIfNeeded(rawGeojson);
+        const processedFeatures = (reprojected.features || []).map((feature, index) => {
+          const properties = { ...(feature.properties || {}) };
+          const riskValue = parseNumericValue(properties['T_FEMA_National_Risk_Index_$_.FEMAIndex']);
+          const populationValue = parseNumericValue(
+            properties['T_CENSUS_Community_Resilience_Est$_.Total_population__excludes_adult_correctional_juvenile_facilitie']
+          );
+
+          return {
+            ...feature,
+            id: feature.id ?? properties['L0Census_Tracts.GEOID'] ?? index,
+            properties: {
+              ...properties,
+              __riskIndex: riskValue,
+              __population: populationValue
+            }
+          };
+        });
+
+        const processedGeojson = {
+          ...reprojected,
+          features: processedFeatures
+        };
+
+        const riskValues = processedFeatures
+          .map(feature => feature.properties.__riskIndex)
+          .filter(value => Number.isFinite(value));
+        const populationValues = processedFeatures
+          .map(feature => feature.properties.__population)
+          .filter(value => Number.isFinite(value));
+
+        const riskStats = getRangeStats(riskValues);
+        const populationStats = getRangeStats(populationValues);
+
+        const riskMissing = processedFeatures.length - riskValues.length;
+        const populationMissing = processedFeatures.length - populationValues.length;
+
+        censusDataRef.current = processedGeojson;
+        const statsPayload = {
+          risk: riskStats,
+          population: populationStats,
+          counts: {
+            total: processedFeatures.length,
+            missingRisk: riskMissing,
+            missingPopulation: populationMissing
+          }
+        };
+        censusStatsRef.current = statsPayload;
+        setCensusStats(statsPayload);
+        addCensusSourceAndLayers();
+
+        const bounds = new mapboxgl.LngLatBounds();
+        let hasBounds = false;
+        processedFeatures.forEach(feature => {
+          if (!feature.geometry) return;
+          walkCoordinates(feature.geometry, coord => {
+            if (!hasBounds) {
+              bounds.set(coord, coord);
+              hasBounds = true;
+            } else {
+              bounds.extend(coord);
+            }
+          });
+        });
+
+        if (hasBounds) {
+          map.current.fitBounds(bounds, { padding: 50, duration: 1200 });
+        }
+
+        console.groupCollapsed('[Census] Census Tract Data Summary');
+        console.log('Total tracts loaded:', processedFeatures.length);
+        console.log('FEMA Risk Index range:', riskStats.min, riskStats.max);
+        console.log('Population range:', populationStats.min, populationStats.max);
+        if (riskMissing > 0) {
+          console.warn(`Missing FEMA Risk Index for ${riskMissing} tracts`, processedFeatures
+            .filter(feature => !Number.isFinite(feature.properties.__riskIndex))
+            .slice(0, 10)
+            .map(feature => feature.properties['L0Census_Tracts.GEOID'] || feature.id));
+        }
+        if (populationMissing > 0) {
+          console.warn(`Missing population for ${populationMissing} tracts`, processedFeatures
+            .filter(feature => !Number.isFinite(feature.properties.__population))
+            .slice(0, 10)
+            .map(feature => feature.properties['L0Census_Tracts.GEOID'] || feature.id));
+        }
+        console.groupEnd();
+        console.info('[Census] Census tract layers added successfully');
+      } catch (censusError) {
+        console.error('Error loading census tract data:', censusError);
+      }
     });
-  }, []);
+  }, [addCensusSourceAndLayers]);
+
+  useEffect(() => {
+    censusVisibleRef.current = censusVisible;
+  }, [censusVisible]);
+
+  useEffect(() => {
+    censusViewRef.current = activeCensusView;
+    if (!map.current) return;
+    const riskVisibility = censusVisible && activeCensusView === 'risk' ? 'visible' : 'none';
+    const populationVisibility = censusVisible && activeCensusView === 'population' ? 'visible' : 'none';
+    if (map.current.getLayer('census-tracts-risk')) {
+      map.current.setLayoutProperty('census-tracts-risk', 'visibility', riskVisibility);
+    }
+    if (map.current.getLayer('census-tracts-population')) {
+      map.current.setLayoutProperty('census-tracts-population', 'visibility', populationVisibility);
+    }
+    if (map.current.getLayer('census-tracts-outline')) {
+      map.current.setLayoutProperty('census-tracts-outline', 'visibility', censusVisible ? 'visible' : 'none');
+    }
+    if (!censusVisible) {
+      if (hoveredCensusIdRef.current !== null) {
+        map.current.setFeatureState(
+          { source: 'census-tracts', id: hoveredCensusIdRef.current },
+          { hover: false }
+        );
+        hoveredCensusIdRef.current = null;
+      }
+      map.current.getCanvas().style.cursor = '';
+    }
+    if (censusLayersReady) {
+      addCensusSourceAndLayers();
+    }
+  }, [activeCensusView, censusVisible, censusLayersReady, addCensusSourceAndLayers]);
+
+  useEffect(() => {
+    if (censusStats) {
+      censusStatsRef.current = censusStats;
+      if (censusLayersReady) {
+        addCensusSourceAndLayers();
+      }
+    }
+  }, [censusStats, censusLayersReady, addCensusSourceAndLayers]);
+
+  const legendStats = censusStats ? (activeCensusView === 'risk' ? censusStats.risk : censusStats.population) : null;
+  const legendColors = activeCensusView === 'risk'
+    ? ['#4CAF50', '#FFC107', '#F44336']
+    : ['#ffffcc', '#41b6c4', '#253494'];
 
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', overflow: 'hidden' }}>
@@ -488,7 +956,106 @@ const App = () => {
           {map.current && (
             <MapboxPopup map={map.current} activeFeature={activeFeature} />
           )}
-          
+
+          <div style={{
+            position: 'absolute',
+            right: '20px',
+            bottom: '320px',
+            zIndex: 1000
+          }}>
+            <button
+              onClick={handleCensusVisibilityToggle}
+              disabled={!censusLayersReady}
+              style={{
+                padding: '10px 16px',
+                background: censusVisible ? 'linear-gradient(135deg, #0b8457, #06623b)' : 'linear-gradient(135deg, #546e7a, #2f4858)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: censusLayersReady ? 'pointer' : 'not-allowed',
+                fontSize: '0.9em',
+                boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              {censusVisible ? 'Hide Census Layer' : 'Show Census Layer'}
+            </button>
+          </div>
+
+          {censusLayersReady && censusStats && censusVisible && (
+            <>
+              <div style={{
+                position: 'absolute',
+                bottom: '210px',
+                right: '20px',
+                zIndex: 1000,
+                background: 'rgba(255, 255, 255, 0.95)',
+                padding: '16px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                minWidth: '220px'
+              }}>
+                <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '10px' }}>
+                  View Layer By:
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontSize: '0.9em', color: '#1b3a4b' }}>
+                  <input
+                    type="radio"
+                    name="census-view"
+                    value="risk"
+                    checked={activeCensusView === 'risk'}
+                    onChange={() => handleCensusViewChange('risk')}
+                  />
+                  FEMA Risk Index
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9em', color: '#1b3a4b' }}>
+                  <input
+                    type="radio"
+                    name="census-view"
+                    value="population"
+                    checked={activeCensusView === 'population'}
+                    onChange={() => handleCensusViewChange('population')}
+                  />
+                  Population
+                </label>
+              </div>
+
+              <div style={{
+                position: 'absolute',
+                right: '20px',
+                bottom: '70px',
+                zIndex: 1000,
+                background: 'rgba(255, 255, 255, 0.95)',
+                padding: '16px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                minWidth: '220px'
+              }}>
+                <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
+                  {activeCensusView === 'risk' ? 'FEMA Risk Index' : 'Population'}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '10px' }}>
+                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[0], border: '1px solid rgba(0,0,0,0.1)' }} />
+                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
+                    Low: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.min) : formatWithCommas(legendStats?.min != null ? Math.round(legendStats.min) : legendStats?.min)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '10px' }}>
+                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[1], border: '1px solid rgba(0,0,0,0.1)' }} />
+                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
+                    Mid: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.mid) : formatWithCommas(legendStats?.mid != null ? Math.round(legendStats.mid) : legendStats?.mid)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[2], border: '1px solid rgba(0,0,0,0.1)' }} />
+                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
+                    High: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.max) : formatWithCommas(legendStats?.max != null ? Math.round(legendStats.max) : legendStats?.max)}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+
           {loading && (
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(255, 255, 255, 0.9)', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 1000 }}>
               <div style={{ width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #3498db', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }}></div>
@@ -556,7 +1123,7 @@ const App = () => {
           {/* Map Style Toggle */}
           <div style={{ 
             position: 'absolute', 
-            bottom: '20px', 
+            bottom: '30px', 
             right: '20px', 
             background: 'white', 
             borderRadius: '25px', 
