@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
 
+
 const parseNumericValue = (value) => {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
