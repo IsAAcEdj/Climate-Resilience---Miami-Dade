@@ -903,7 +903,9 @@ const App = () => {
       </div>
 
       <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-
+  <aside style="flex: 0 0 30%; background: #f0f0f0; padding: 20px;">
+    Left sidebar
+  </aside>
 
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
           <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
