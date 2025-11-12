@@ -902,7 +902,10 @@ const App = () => {
         </div>
       </div>  
 
-      <aside style={{
+      
+
+      <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
+<aside style={{
           width: '30%',
           minWidth: '300px',
           maxWidth: '400px',
@@ -918,30 +921,28 @@ const App = () => {
             color: '#1b3a4b', 
             marginBottom: '20px' 
           }}>
-            Sidebar Title
+            Filler
           </h2>
           
           <div style={{ marginBottom: '24px' }}>
             <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
-              Section 1
+              Filler
             </h3>
             <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
-              Add your sidebar content here. This could be filters, project lists, statistics, or any other information.
+              Add content
             </p>
           </div>
 
           <div style={{ marginBottom: '24px' }}>
             <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
-              Section 2
+              Filler
             </h3>
             <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
-              More content can go here.
+              Add content
             </p>
           </div>
         </aside>
         
-      <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
           <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
           {map.current && (
