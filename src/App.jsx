@@ -903,9 +903,6 @@ const App = () => {
       </div>
 
       <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-        <aside style="flex: 0 0 30%; background: #f0f0f0; padding: 20px;">
-             Left sidebar
-        </aside>
 
 
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
@@ -1063,9 +1060,6 @@ const App = () => {
         </div>
       </div>
 
-      <aside style="flex: 0 0 30%; background: #f0f0f0; padding: 20px;">
-    Right sidebar
-      </aside>
 
       <style>{`
         @keyframes spin {
