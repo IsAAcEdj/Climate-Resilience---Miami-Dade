@@ -903,9 +903,49 @@ const App = () => {
       </div>
 
       <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-  <aside style="flex: 0 0 30%; background: #f0f0f0; padding: 20px;">
-    Left sidebar
-  </aside>
+          <aside
+              className={`${
+                isOpen ? 'w-64' : 'w-0'
+              } bg-gray-800 text-white transition-all duration-300 overflow-hidden`}
+            >
+              <div className="p-4">
+                <h2 className="text-2xl font-bold mb-8">My App</h2>
+                
+                <nav className="space-y-2">
+                  <a
+                    href="#"
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <Home size={20} />
+                    <span>Home</span>
+                  </a>
+                  
+                  <a
+                    href="#"
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <FileText size={20} />
+                    <span>Documents</span>
+                  </a>
+                  
+                  <a
+                    href="#"
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <User size={20} />
+                    <span>Profile</span>
+                  </a>
+                  
+                  <a
+                    href="#"
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    <Settings size={20} />
+                    <span>Settings</span>
+                  </a>
+                </nav>
+              </div>
+            </aside>
 
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
           <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
