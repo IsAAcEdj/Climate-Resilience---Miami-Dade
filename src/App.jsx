@@ -943,7 +943,42 @@ const App = () => {
           </div>
         </aside>
 
-        <aside style={{
+        
+        
+
+
+        <div style={{ flex: 1, position: 'relative', height: '100%' }}>
+          <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
+          {map.current && (
+            <MapboxPopup map={map.current} activeFeature={activeFeature} />
+          )}
+
+          <div style={{
+            position: 'absolute',
+            right: '20px',
+            bottom: '320px',
+            zIndex: 1000
+          }}>
+            <button
+              onClick={handleCensusVisibilityToggle}
+              disabled={!censusLayersReady}
+              style={{
+                padding: '10px 16px',
+                background: censusVisible ? 'linear-gradient(135deg, #0b8457, #06623b)' : 'linear-gradient(135deg, #546e7a, #2f4858)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: censusLayersReady ? 'pointer' : 'not-allowed',
+                fontSize: '0.9em',
+                boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              {censusVisible ? 'Hide Census Layer' : 'Show Census Layer'}
+            </button>
+          </div>
+
+      <aside style={{
                               width: '30%',
                               minWidth: '300px',
                               maxWidth: '400px',
@@ -982,41 +1017,6 @@ const App = () => {
                               </div>
                             </aside>
 
-        
-
-
-        <div style={{ flex: 1, position: 'relative', height: '100%' }}>
-          <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
-          {map.current && (
-            <MapboxPopup map={map.current} activeFeature={activeFeature} />
-          )}
-
-          <div style={{
-            position: 'absolute',
-            right: '20px',
-            bottom: '320px',
-            zIndex: 1000
-          }}>
-            <button
-              onClick={handleCensusVisibilityToggle}
-              disabled={!censusLayersReady}
-              style={{
-                padding: '10px 16px',
-                background: censusVisible ? 'linear-gradient(135deg, #0b8457, #06623b)' : 'linear-gradient(135deg, #546e7a, #2f4858)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: censusLayersReady ? 'pointer' : 'not-allowed',
-                fontSize: '0.9em',
-                boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {censusVisible ? 'Hide Census Layer' : 'Show Census Layer'}
-            </button>
-          </div>
-
-      
 
 
           {censusLayersReady && censusStats && censusVisible && (
