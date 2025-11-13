@@ -531,7 +531,151 @@ const App = () => {
           {map.current && (
             <MapboxPopup map={map.current} activeFeature={activeFeature} />
           )}
+<<<<<<< Updated upstream
           
+=======
+
+          <div style={{
+            position: 'absolute',
+            right: '20px',
+            bottom: '320px',
+            zIndex: 1000
+          }}>
+            <button
+              onClick={handleCensusVisibilityToggle}
+              disabled={!censusLayersReady}
+              style={{
+                padding: '10px 16px',
+                background: censusVisible ? 'linear-gradient(135deg, #0b8457, #06623b)' : 'linear-gradient(135deg, #546e7a, #2f4858)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: censusLayersReady ? 'pointer' : 'not-allowed',
+                fontSize: '0.9em',
+                boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              {censusVisible ? 'Hide Census Layer' : 'Show Census Layer'}
+            </button>
+          </div>
+
+      <aside style={{
+                              width: '30%',
+                              minWidth: '300px',
+                              maxWidth: '400px',
+                              background: '#ffffff',
+                              borderLeft: '1px solid #e0e0e0',
+                              overflowY: 'auto',
+                              padding: '20px',
+                              boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+                              flexDirection: 'row-reverse'
+                            }}>
+                              <h2 style={{ 
+                                fontSize: '1.5em', 
+                                fontWeight: '600', 
+                                color: '#1b3a4b', 
+                                marginBottom: '20px' 
+                              }}>
+                                Filler
+                              </h2>
+                              
+                              <div style={{ marginBottom: '24px' }}>
+                                <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+                                  Filler
+                                </h3>
+                                <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
+                                  Add content
+                                </p>
+                              </div>
+
+                              <div style={{ marginBottom: '24px' }}>
+                                <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+                                  Filler
+               </h3>
+             <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
+                 Add content
+             </p>
+           </div>
+        </aside>
+
+
+
+          {/* {censusLayersReady && censusStats && censusVisible && (
+            <>
+              <div style={{
+                position: 'absolute',
+                bottom: '210px',
+                right: '20px',
+                zIndex: 1000,
+                background: 'rgba(255, 255, 255, 0.95)',
+                padding: '16px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                minWidth: '220px'
+              }}>
+                <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '10px' }}>
+                  View Layer By:
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontSize: '0.9em', color: '#1b3a4b' }}>
+                  <input
+                    type="radio"
+                    name="census-view"
+                    value="risk"
+                    checked={activeCensusView === 'risk'}
+                    onChange={() => handleCensusViewChange('risk')}
+                  />
+                  FEMA Risk Index
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9em', color: '#1b3a4b' }}>
+                  <input
+                    type="radio"
+                    name="census-view"
+                    value="population"
+                    checked={activeCensusView === 'population'}
+                    onChange={() => handleCensusViewChange('population')}
+                  />
+                  Population
+                </label>
+              </div>
+
+              <div style={{
+                position: 'absolute',
+                right: '20px',
+                bottom: '70px',
+                zIndex: 1000,
+                background: 'rgba(255, 255, 255, 0.95)',
+                padding: '16px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                minWidth: '220px'
+              }}>
+                <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
+                  {activeCensusView === 'risk' ? 'FEMA Risk Index' : 'Population'}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '10px' }}>
+                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[0], border: '1px solid rgba(0,0,0,0.1)' }} />
+                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
+                    Low: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.min) : formatWithCommas(legendStats?.min != null ? Math.round(legendStats.min) : legendStats?.min)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '10px' }}>
+                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[1], border: '1px solid rgba(0,0,0,0.1)' }} />
+                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
+                    Mid: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.mid) : formatWithCommas(legendStats?.mid != null ? Math.round(legendStats.mid) : legendStats?.mid)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[2], border: '1px solid rgba(0,0,0,0.1)' }} />
+                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
+                    High: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.max) : formatWithCommas(legendStats?.max != null ? Math.round(legendStats.max) : legendStats?.max)}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+
+>>>>>>> Stashed changes
           {loading && (
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(255, 255, 255, 0.9)', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 1000 }}>
               <div style={{ width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #3498db', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }}></div>
@@ -597,6 +741,7 @@ const App = () => {
           </div>
 
           {/* Map Style Toggle */}
+          {/*
           <div style={{ 
             position: 'absolute', 
             bottom: '20px', 
@@ -635,6 +780,16 @@ const App = () => {
               </span>
             </button>
           </div>
+<<<<<<< Updated upstream
+=======
+
+
+ */}
+
+
+
+          
+>>>>>>> Stashed changes
         </div>
       </div>
   <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
