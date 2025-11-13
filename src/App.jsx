@@ -978,12 +978,12 @@ const App = () => {
             </button>
           </div>
 
-<aside style={{
+      <aside style={{
                       width: '30%',
                       minWidth: '300px',
                       maxWidth: '400px',
                       background: '#ffffff',
-                      borderRight: '1px solid #e0e0e0',
+                      borderLeft: '1px solid #e0e0e0',
                       overflowY: 'auto',
                       padding: '20px',
                       boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
