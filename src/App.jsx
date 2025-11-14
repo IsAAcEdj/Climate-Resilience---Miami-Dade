@@ -356,7 +356,7 @@ const App = () => {
         },
         paint: {
           'line-color': '#000000',
-          'line-width': 2,
+          'line-width': 0.4,
           'line-opacity': 0.8
         }
       });
@@ -1123,26 +1123,25 @@ const App = () => {
                               boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
                               flexDirection: 'row-reverse'
                             }}>
-                              <h2 style={{ 
-                                fontSize: '1.5em', 
-                                fontWeight: '600', 
-                                color: '#1b3a4b', 
-                                marginBottom: '20px' 
-                              }}>
+                              <h2 style={{
+                                fontSize: '1.5em',                               fontWeight: '600', 
+                              color: '#1b3a4b', 
+                              marginBottom: '20px' 
+                            }}>
+                              Filler
+                            </h2>
+                            
+                            <div style={{ marginBottom: '24px' }}>
+                              <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
                                 Filler
-                              </h2>
-                              
-                              <div style={{ marginBottom: '24px' }}>
-                                <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
-                                  Filler
-                                </h3>
-                                <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
-                                  Add content
-                                </p>
-                              </div>
+                              </h3>
+                              <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
+                                Add content
+                              </p>
+                            </div>
 
-                              <div style={{ marginBottom: '24px' }}>
-                                <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+                            <div style={{ marginBottom: '24px' }}>
+                              <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
                                   Filler
                </h3>
              <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
