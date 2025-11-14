@@ -249,8 +249,8 @@ const App = () => {
 
     if (!stats) return;
 
-    const riskColors = { min: '#4CAF50', mid: '#FFC107', max: '#F44336', single: '#FFC107' };
-    const populationColors = { min: '#ffffcc', mid: '#41b6c4', max: '#253494', single: '#41b6c4' };
+    const riskColors = { min: '#66BB6A', mid: '#FF9800', max: '#C62828', single: '#FF9800' };
+    const populationColors = { min: '#fff9c4', mid: '#00ACC1', max: '#0D47A1', single: '#00ACC1' };
 
     const buildColorExpression = (rangeStats, propertyName, palette) => {
       if (!rangeStats || rangeStats.min === null || rangeStats.max === null) {
@@ -313,8 +313,8 @@ const App = () => {
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
-            0.6,
-            0.35
+            0.7,
+            0.5
           ]
         }
       });
@@ -336,8 +336,8 @@ const App = () => {
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
-            0.6,
-            0.35
+            0.8,
+            0.6
           ]
         }
       });
@@ -355,9 +355,9 @@ const App = () => {
           visibility: outlineVisibility
         },
         paint: {
-          'line-color': '#000000',
-          'line-width': 2,
-          'line-opacity': 0.8
+          'line-color': '#777777',
+          'line-width': 1,
+          'line-opacity': 0.6
         }
       });
     } else {
@@ -462,8 +462,8 @@ const App = () => {
     const newStyle = isSatelliteView ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/satellite-v9';
     
     map.current.once('styledata', () => {
-      // Re-add district polygons after style change
-      Object.keys(districtsRef.current).forEach(districtId => {
+      // Commented out: Re-add district polygons after style change (miami_cities.geojson)
+      /* Object.keys(districtsRef.current).forEach(districtId => {
         const district = districtsRef.current[districtId];
         
         if (!map.current.getSource(districtId)) {
@@ -516,7 +516,7 @@ const App = () => {
         map.current.on('mouseleave', `${districtId}-fill`, () => {
           map.current.getCanvas().style.cursor = '';
         });
-      });
+      }); */
 
       // Re-add project markers
       if (allProjectsData) {
@@ -599,7 +599,8 @@ const App = () => {
 
     map.current.on('load', async () => {
       try {
-        Object.keys(districtsRef.current).forEach(districtId => {
+        // Commented out: miami_cities.geojson layer rendering
+        /* Object.keys(districtsRef.current).forEach(districtId => {
           const district = districtsRef.current[districtId];
 
           map.current.addSource(districtId, {
@@ -645,7 +646,7 @@ const App = () => {
           map.current.on('mouseleave', `${districtId}-fill`, () => {
             map.current.getCanvas().style.cursor = '';
           });
-        });
+        }); */
       } catch (err) {
         console.error('Map initialization error:', err);
         setError('Error initializing map');
@@ -848,8 +849,8 @@ const App = () => {
 
   const legendStats = censusStats ? (activeCensusView === 'risk' ? censusStats.risk : censusStats.population) : null;
   const legendColors = activeCensusView === 'risk'
-    ? ['#4CAF50', '#FFC107', '#F44336']
-    : ['#ffffcc', '#41b6c4', '#253494'];
+    ? ['#66BB6A', '#FF9800', '#C62828']
+    : ['#fff9c4', '#00ACC1', '#0D47A1'];
 
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', overflow: 'hidden' }}>
@@ -900,57 +901,52 @@ const App = () => {
             }} 
           />
         </div>
-      </div>
+      </div>  
+
+      
 
       <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-        {/* <div style={{ width: '350px', background: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.1)', padding: '20px', overflowY: 'auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '30px' }}>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>17</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Total Projects</div>
-            </div>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>$1B+</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Total Investment</div>
-            </div>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>2</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Completed</div>
-            </div>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>15</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Ongoing</div>
-            </div>
+<aside style={{
+          width: '30%',
+          minWidth: '300px',
+          maxWidth: '400px',
+          background: '#ffffff',
+          borderRight: '1px solid #e0e0e0',
+          overflowY: 'auto',
+          padding: '20px',
+          boxShadow: '2px 0 8px rgba(0,0,0,0.1)'
+        }}>
+          <h2 style={{ 
+            fontSize: '1.5em', 
+            fontWeight: '600', 
+            color: '#1b3a4b', 
+            marginBottom: '20px' 
+          }}>
+            Filler
+          </h2>
+          
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+              Filler
+            </h3>
+            <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
+              Add content
+            </p>
           </div>
 
-          <div style={{ marginBottom: '30px' }}>
-            <h3 style={{ color: '#2c3e50', marginBottom: '15px', fontSize: '1.2em' }}>Project Types</h3>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#e74c3c' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Green Infrastructure</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#3498db' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Grey Infrastructure</div>
-            </div>
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+              Filler
+            </h3>
+            <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
+              Add content
+            </p>
           </div>
+        </aside>
 
-          <div style={{ marginBottom: '30px' }}>
-            <h3 style={{ color: '#2c3e50', marginBottom: '15px', fontSize: '1.2em' }}>Disaster Focus</h3>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#9b59b6' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Flooding & Sea Level Rise</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#e67e22' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Multi-hazard</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#1abc9c' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Critical Infrastructure</div>
-            </div>
-          </div>
-        </div> */}
+        
+        
+
 
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
           <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
@@ -982,6 +978,10 @@ const App = () => {
               {censusVisible ? 'Hide Census Layer' : 'Show Census Layer'}
             </button>
           </div>
+
+      
+
+
 
           {censusLayersReady && censusStats && censusVisible && (
             <>
@@ -1103,9 +1103,14 @@ const App = () => {
                 {isSatelliteView ? 'Standard' : 'Satellite'}
               </span>
             </button>
-          </div>
+
+
+
+
+
         </div>
       </div>
+
 
       <style>{`
         @keyframes spin {
