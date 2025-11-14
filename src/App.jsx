@@ -248,8 +248,8 @@ const App = () => {
 
     if (!stats) return;
 
-    const riskColors = { min: '#4CAF50', mid: '#FFC107', max: '#F44336', single: '#FFC107' };
-    const populationColors = { min: '#ffffcc', mid: '#41b6c4', max: '#253494', single: '#41b6c4' };
+    const riskColors = { min: '#66BB6A', mid: '#FF9800', max: '#C62828', single: '#FF9800' };
+    const populationColors = { min: '#fff9c4', mid: '#00ACC1', max: '#0D47A1', single: '#00ACC1' };
 
     const buildColorExpression = (rangeStats, propertyName, palette) => {
       if (!rangeStats || rangeStats.min === null || rangeStats.max === null) {
@@ -312,8 +312,8 @@ const App = () => {
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
-            0.6,
-            0.35
+            0.7,
+            0.5
           ]
         }
       });
@@ -354,9 +354,9 @@ const App = () => {
           visibility: outlineVisibility
         },
         paint: {
-          'line-color': '#000000',
-          'line-width': 2,
-          'line-opacity': 0.8
+          'line-color': '#888888',
+          'line-width': 1,
+          'line-opacity': 0.5
         }
       });
     } else {
@@ -847,8 +847,8 @@ const App = () => {
 
   const legendStats = censusStats ? (activeCensusView === 'risk' ? censusStats.risk : censusStats.population) : null;
   const legendColors = activeCensusView === 'risk'
-    ? ['#4CAF50', '#FFC107', '#F44336']
-    : ['#ffffcc', '#41b6c4', '#253494'];
+    ? ['#66BB6A', '#FF9800', '#C62828']
+    : ['#fff9c4', '#00ACC1', '#0D47A1'];
 
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', overflow: 'hidden' }}>
