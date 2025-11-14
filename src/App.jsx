@@ -336,8 +336,8 @@ const App = () => {
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
-            0.6,
-            0.35
+            0.8,
+            0.6
           ]
         }
       });
@@ -355,9 +355,9 @@ const App = () => {
           visibility: outlineVisibility
         },
         paint: {
-          'line-color': '#000000',
-          'line-width': 0.4,
-          'line-opacity': 0.8
+          'line-color': '#777777',
+          'line-width': 1,
+          'line-opacity': 0.6
         }
       });
     } else {
@@ -462,8 +462,8 @@ const App = () => {
     const newStyle = isSatelliteView ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/satellite-v9';
     
     map.current.once('styledata', () => {
-      // Re-add district polygons after style change
-      Object.keys(districtsRef.current).forEach(districtId => {
+      // Commented out: Re-add district polygons after style change (miami_cities.geojson)
+      /* Object.keys(districtsRef.current).forEach(districtId => {
         const district = districtsRef.current[districtId];
         
         if (!map.current.getSource(districtId)) {
@@ -516,7 +516,7 @@ const App = () => {
         map.current.on('mouseleave', `${districtId}-fill`, () => {
           map.current.getCanvas().style.cursor = '';
         });
-      });
+      }); */
 
       // Re-add project markers
       if (allProjectsData) {
@@ -599,7 +599,8 @@ const App = () => {
 
     map.current.on('load', async () => {
       try {
-        Object.keys(districtsRef.current).forEach(districtId => {
+        // Commented out: miami_cities.geojson layer rendering
+        /* Object.keys(districtsRef.current).forEach(districtId => {
           const district = districtsRef.current[districtId];
 
           map.current.addSource(districtId, {
@@ -645,7 +646,7 @@ const App = () => {
           map.current.on('mouseleave', `${districtId}-fill`, () => {
             map.current.getCanvas().style.cursor = '';
           });
-        });
+        }); */
       } catch (err) {
         console.error('Map initialization error:', err);
         setError('Error initializing map');
