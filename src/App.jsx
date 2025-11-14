@@ -13,6 +13,32 @@ const App = () => {
   const [allProjectsData, setAllProjectsData] = useState(null);
   const [isSatelliteView, setIsSatelliteView] = useState(false);
   const [activeFeature, setActiveFeature] = useState(null);
+<<<<<<< Updated upstream
+=======
+  const [censusStats, setCensusStats] = useState(null);
+  const [censusLayersReady, setCensusLayersReady] = useState(false);
+  const [activeCensusView, setActiveCensusView] = useState('risk');
+  const [censusVisible, setCensusVisible] = useState(true);
+  const censusEventsBoundRef = useRef(false);
+  const censusVisibleRef = useRef(true);
+  const citiesVisible = true;
+
+  const handleCensusViewChange = (view) => {
+    censusViewRef.current = view;
+    setActiveCensusView(view);
+  };
+
+  const handleCensusVisibilityToggle = () => {
+    if(citiesVisible){
+      map.setLayoutProperty('districtsRef', 'visibility', 'none');
+      citiesVisible = false;
+    } else {
+      map.setLayoutProperty('districtsRef', 'visibility', 'visible');
+      citiesVisible = true;
+    }
+    setCensusVisible((prev) => !prev);
+  };
+>>>>>>> Stashed changes
 
   // Define district boundaries
   
@@ -180,8 +206,13 @@ const App = () => {
     const newStyle = isSatelliteView ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/satellite-v9';
     
     map.current.once('styledata', () => {
+<<<<<<< Updated upstream
       // Re-add district polygons after style change
       Object.keys(districtsRef.current).forEach(districtId => {
+=======
+      // Commented out: Re-add district polygons after style change (miami_cities.geojson)
+       Object.keys(districtsRef.current).forEach(districtId => {
+>>>>>>> Stashed changes
         const district = districtsRef.current[districtId];
         
         if (!map.current.getSource(districtId)) {
