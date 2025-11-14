@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
 
+
 const parseNumericValue = (value) => {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -354,9 +355,9 @@ const App = () => {
           visibility: outlineVisibility
         },
         paint: {
-          'line-color': '#888888',
-          'line-width': 1,
-          'line-opacity': 0.5
+          'line-color': '#000000',
+          'line-width': 0.4,
+          'line-opacity': 0.8
         }
       });
     } else {
@@ -899,57 +900,52 @@ const App = () => {
             }} 
           />
         </div>
-      </div>
+      </div>  
+
+      
 
       <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-        {/* <div style={{ width: '350px', background: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.1)', padding: '20px', overflowY: 'auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '30px' }}>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>17</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Total Projects</div>
-            </div>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>$1B+</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Total Investment</div>
-            </div>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>2</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Completed</div>
-            </div>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>15</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Ongoing</div>
-            </div>
+<aside style={{
+          width: '30%',
+          minWidth: '300px',
+          maxWidth: '400px',
+          background: '#ffffff',
+          borderRight: '1px solid #e0e0e0',
+          overflowY: 'auto',
+          padding: '20px',
+          boxShadow: '2px 0 8px rgba(0,0,0,0.1)'
+        }}>
+          <h2 style={{ 
+            fontSize: '1.5em', 
+            fontWeight: '600', 
+            color: '#1b3a4b', 
+            marginBottom: '20px' 
+          }}>
+            Filler
+          </h2>
+          
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+              Filler
+            </h3>
+            <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
+              Add content
+            </p>
           </div>
 
-          <div style={{ marginBottom: '30px' }}>
-            <h3 style={{ color: '#2c3e50', marginBottom: '15px', fontSize: '1.2em' }}>Project Types</h3>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#e74c3c' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Green Infrastructure</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#3498db' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Grey Infrastructure</div>
-            </div>
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+              Filler
+            </h3>
+            <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
+              Add content
+            </p>
           </div>
+        </aside>
 
-          <div style={{ marginBottom: '30px' }}>
-            <h3 style={{ color: '#2c3e50', marginBottom: '15px', fontSize: '1.2em' }}>Disaster Focus</h3>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#9b59b6' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Flooding & Sea Level Rise</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#e67e22' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Multi-hazard</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#1abc9c' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Critical Infrastructure</div>
-            </div>
-          </div>
-        </div> */}
+        
+        
+
 
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
           <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
@@ -981,6 +977,10 @@ const App = () => {
               {censusVisible ? 'Hide Census Layer' : 'Show Census Layer'}
             </button>
           </div>
+
+      
+
+
 
           {censusLayersReady && censusStats && censusVisible && (
             <>
@@ -1063,62 +1063,9 @@ const App = () => {
             </div>
           )}
 
-          <div style={{ position: 'absolute', top: '150px', right: '10px', background: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', zIndex: 1000, minWidth: '200px' }}>
-            <h4 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '1em' }}>Special Districts</h4>
-            {/* <button
-              onClick={() => zoomToDistrict('cutler-bay')}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '10px',
-                marginBottom: '8px',
-                background: currentDistrict === 'cutler-bay' ? 'linear-gradient(135deg, #27ae60, #229954)' : 'linear-gradient(135deg, #3498db, #2980b9)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontSize: '0.9em',
-                transition: 'all 0.3s'
-              }}
-            >
-              Cutler Bay
-            </button>
-            <button
-              onClick={() => zoomToDistrict('miami-beach')}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '10px',
-                marginBottom: '8px',
-                background: currentDistrict === 'miami-beach' ? 'linear-gradient(135deg, #27ae60, #229954)' : 'linear-gradient(135deg, #3498db, #2980b9)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontSize: '0.9em',
-                transition: 'all 0.3s'
-              }}
-            >
-              Miami Beach
-            </button> */}
-            <button
-              onClick={resetView}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '10px',
-                background: 'linear-gradient(135deg, #95a5a6, #7f8c8d)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontSize: '0.9em',
-                transition: 'all 0.3s'
-              }}
-            >
-              Reset View
-            </button>
-          </div>
+          
+
+
 
           {/* Map Style Toggle */}
           <div style={{ 
@@ -1158,9 +1105,58 @@ const App = () => {
                 {isSatelliteView ? 'Standard' : 'Satellite'}
               </span>
             </button>
+
+            
+
+
+
           </div>
+
+<aside style={{
+                              width: '30%',
+                              minWidth: '300px',
+                              maxWidth: '400px',
+                              background: '#ffffff',
+                              borderLeft: '1px solid #e0e0e0',
+                              overflowY: 'auto',
+                              padding: '20px',
+                              boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+                              flexDirection: 'row-reverse'
+                            }}>
+                              <h2 style={{
+                                fontSize: '1.5em',                               fontWeight: '600', 
+                              color: '#1b3a4b', 
+                              marginBottom: '20px' 
+                            }}>
+                              Filler
+                            </h2>
+                            
+                            <div style={{ marginBottom: '24px' }}>
+                              <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+                                Filler
+                              </h3>
+                              <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
+                                Add content
+                              </p>
+                            </div>
+
+                            <div style={{ marginBottom: '24px' }}>
+                              <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+                                  Filler
+               </h3>
+             <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
+                 Add content
+             </p>
+           </div>
+        </aside>
+
+
+
+
+
         </div>
       </div>
+
 
       <style>{`
         @keyframes spin {
