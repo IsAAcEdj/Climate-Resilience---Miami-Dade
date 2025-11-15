@@ -95,6 +95,7 @@ const App = () => {
   const hoveredCensusIdRef = useRef(null);
   const censusStatsRef = useRef(null);
   const censusViewRef = useRef('risk');
+  const pred3PEDataRef = useRef({}); // Mapping of GEOID to PRED3_PE values
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [allMarkers, setAllMarkers] = useState([]);
@@ -249,46 +250,70 @@ const App = () => {
 
     if (!stats) return;
 
-    const riskColors = { min: '#66BB6A', mid: '#FF9800', max: '#C62828', single: '#FF9800' };
-    const populationColors = { min: '#fff9c4', mid: '#00ACC1', max: '#0D47A1', single: '#00ACC1' };
+    // Color mapping for FEMA Risk Ratings - More distinctive colors
+    const riskRatingColors = {
+      'Very Low': '#4CAF50',           // Bright Green
+      'Relatively Low': '#8BC34A',    // Lime Green
+      'Relatively Moderate': '#FFC107', // Amber/Yellow
+      'Relatively High': '#FF6F00',    // Red-Orange
+      'Very High': '#B71C1C'           // Dark Red
+    };
 
-    const buildColorExpression = (rangeStats, propertyName, palette) => {
-      if (!rangeStats || rangeStats.min === null || rangeStats.max === null) {
+    // Build color expression based on risk rating strings
+    const buildRiskRatingColorExpression = () => {
+      const cases = [];
+      Object.entries(riskRatingColors).forEach(([rating, color]) => {
+        cases.push(['==', ['get', '__riskRating'], rating], color);
+      });
+      // Default color for missing or unknown ratings
+      cases.push('#9e9e9e'); // Gray
+      
+      return ['case', ...cases];
+    };
+
+    const riskColorExpression = buildRiskRatingColorExpression();
+    
+    // Build color expression for PRED3_PE (percentage values)
+    const buildPred3PEColorExpression = () => {
+      const pred3PEStats = stats.pred3PE;
+      if (!pred3PEStats || pred3PEStats.min === null || pred3PEStats.max === null) {
         return [
           'case',
-          ['==', ['typeof', ['get', propertyName]], 'number'],
-          palette.single,
+          ['==', ['typeof', ['get', '__pred3PE']], 'number'],
+          '#9e9e9e',
           '#9e9e9e'
         ];
       }
-      if (rangeStats.min === rangeStats.max) {
+      if (pred3PEStats.min === pred3PEStats.max) {
         return [
           'case',
-          ['==', ['typeof', ['get', propertyName]], 'number'],
-          palette.single,
+          ['==', ['typeof', ['get', '__pred3PE']], 'number'],
+          '#4CAF50',
           '#9e9e9e'
         ];
       }
+      // Color gradient from green (low) to red (high)
       return [
         'case',
-        ['==', ['typeof', ['get', propertyName]], 'number'],
+        ['==', ['typeof', ['get', '__pred3PE']], 'number'],
         [
           'interpolate',
           ['linear'],
-          ['get', propertyName],
-          rangeStats.min, palette.min,
-          rangeStats.mid, palette.mid,
-          rangeStats.max, palette.max
+          ['get', '__pred3PE'],
+          pred3PEStats.min, '#4CAF50',  // Green for low values
+          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.25, '#8BC34A',  // Lime green
+          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.5, '#FFC107',  // Amber
+          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.75, '#FF6F00',  // Red-orange
+          pred3PEStats.max, '#B71C1C'  // Dark red for high values
         ],
         '#9e9e9e'
       ];
     };
 
-    const riskColorExpression = buildColorExpression(stats.risk, '__riskIndex', riskColors);
-    const populationColorExpression = buildColorExpression(stats.population, '__population', populationColors);
+    const pred3PEColorExpression = buildPred3PEColorExpression();
     const isVisible = censusVisibleRef.current;
     const riskVisibility = view === 'risk' && isVisible ? 'visible' : 'none';
-    const populationVisibility = view === 'population' && isVisible ? 'visible' : 'none';
+    const pred3PEVisibility = view === 'pred3pe' && isVisible ? 'visible' : 'none';
     const outlineVisibility = isVisible ? 'visible' : 'none';
 
     if (map.current.getSource('census-tracts')) {
@@ -323,7 +348,32 @@ const App = () => {
       map.current.setLayoutProperty('census-tracts-risk', 'visibility', riskVisibility);
     }
 
-    if (!map.current.getLayer('census-tracts-population')) {
+    // Add PRED3_PE layer
+    if (!map.current.getLayer('census-tracts-pred3pe')) {
+      map.current.addLayer({
+        id: 'census-tracts-pred3pe',
+        type: 'fill',
+        source: 'census-tracts',
+        layout: {
+          visibility: pred3PEVisibility
+        },
+        paint: {
+          'fill-color': pred3PEColorExpression,
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.7,
+            0.5
+          ]
+        }
+      });
+    } else {
+      map.current.setPaintProperty('census-tracts-pred3pe', 'fill-color', pred3PEColorExpression);
+      map.current.setLayoutProperty('census-tracts-pred3pe', 'visibility', pred3PEVisibility);
+    }
+
+    // Removed: census-tracts-population layer - population layer disabled
+    /* if (!map.current.getLayer('census-tracts-population')) {
       map.current.addLayer({
         id: 'census-tracts-population',
         type: 'fill',
@@ -344,7 +394,7 @@ const App = () => {
     } else {
       map.current.setPaintProperty('census-tracts-population', 'fill-color', populationColorExpression);
       map.current.setLayoutProperty('census-tracts-population', 'visibility', populationVisibility);
-    }
+    } */
 
     if (!map.current.getLayer('census-tracts-outline')) {
       map.current.addLayer({
@@ -365,7 +415,7 @@ const App = () => {
     }
 
     if (!censusEventsBoundRef.current) {
-      const censusLayerIds = ['census-tracts-risk', 'census-tracts-population'];
+      const censusLayerIds = ['census-tracts-risk', 'census-tracts-pred3pe'];
 
       const handleHover = (e) => {
         if (!map.current) return;
@@ -405,11 +455,9 @@ const App = () => {
         const props = feature.properties || {};
         const tractName = props['L0Census_Tracts.NAME'] || 'Census Tract';
         const tractId = props['L0Census_Tracts.GEOID'] || feature.id || 'N/A';
-        const riskRating = props['T_FEMA_National_Risk_Index_$_.FEMAIndexRating'] || 'Not Rated';
-        const riskIndexRaw = parseNumericValue(props['T_FEMA_National_Risk_Index_$_.FEMAIndex']);
-        const populationRaw = parseNumericValue(
-          props['T_CENSUS_Community_Resilience_Est$_.Total_population__excludes_adult_correctional_juvenile_facilitie']
-        );
+        const riskRating = props['__riskRating'] || props['T_FEMA_National_Risk_Index_$_.FEMAIndexRating'] || 'Not Rated';
+        const pred3PE = props['__pred3PE'];
+        // Removed: riskIndexRaw - only showing rating now
 
         const popupHtml = `
           <div style="font-family: 'Inter', 'Segoe UI', sans-serif; min-width: 220px;">
@@ -420,15 +468,12 @@ const App = () => {
               <span style="font-weight: 600;">FEMA Risk Rating:</span>
               <span style="margin-left: 6px;">${riskRating}</span>
             </div>
+            ${pred3PE !== null && pred3PE !== undefined ? `
             <div style="font-size: 0.9em; color: #1b3a4b; margin-bottom: 12px;">
-              <span style="font-weight: 600;">FEMA Risk Index:</span>
-              <span style="margin-left: 6px;">${riskIndexRaw !== null ? riskIndexRaw.toFixed(2) : '—'}</span>
+              <span style="font-weight: 600;">PRED3_PE:</span>
+              <span style="margin-left: 6px;">${pred3PE.toFixed(2)}%</span>
             </div>
-            <hr style="border: none; border-top: 1px solid #e0e6ed; margin: 8px 0;" />
-            <div style="font-size: 0.9em; color: #1b3a4b;">
-              <span style="font-weight: 600;">Population:</span>
-              <span style="margin-left: 6px;">${populationRaw !== null ? formatWithCommas(Math.round(populationRaw)) : '—'}</span>
-            </div>
+            ` : ''}
           </div>
         `;
 
@@ -705,6 +750,59 @@ const App = () => {
         setLoading(false);
       }
 
+      // Load FL_CRE.csv data
+      try {
+        const csvResponse = await fetch('/FL_CRE.csv');
+        if (csvResponse.ok) {
+          const csvText = await csvResponse.text();
+          const lines = csvText.split('\n').filter(line => line.trim());
+          
+          // Simple CSV parser that handles quoted fields
+          const parseCSVLine = (line) => {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              if (char === '"') {
+                inQuotes = !inQuotes;
+              } else if (char === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+              } else {
+                current += char;
+              }
+            }
+            result.push(current.trim());
+            return result;
+          };
+          
+          const headers = parseCSVLine(lines[0]);
+          const geoIdIndex = headers.indexOf('GEO_ID');
+          const pred3PEIndex = headers.indexOf('PRED3_PE');
+          
+          const pred3PEMap = {};
+          for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            const values = parseCSVLine(lines[i]);
+            if (values.length > Math.max(geoIdIndex, pred3PEIndex)) {
+              const geoId = values[geoIdIndex]?.trim();
+              const pred3PE = parseFloat(values[pred3PEIndex]?.trim());
+              
+              if (geoId && !isNaN(pred3PE)) {
+                // Convert "1400000US12086000107" to "12086000107"
+                const geoid = geoId.replace('1400000US', '');
+                pred3PEMap[geoid] = pred3PE;
+              }
+            }
+          }
+          pred3PEDataRef.current = pred3PEMap;
+          console.log(`[PRED3_PE] Loaded ${Object.keys(pred3PEMap).length} census tract values`);
+        }
+      } catch (csvError) {
+        console.warn('Error loading FL_CRE.csv:', csvError);
+      }
+
       try {
         const response = await fetch('/femaindex.geojson');
         if (!response.ok) {
@@ -715,18 +813,21 @@ const App = () => {
         const reprojected = reprojectFeatureCollectionIfNeeded(rawGeojson);
         const processedFeatures = (reprojected.features || []).map((feature, index) => {
           const properties = { ...(feature.properties || {}) };
-          const riskValue = parseNumericValue(properties['T_FEMA_National_Risk_Index_$_.FEMAIndex']);
+          const riskRating = properties['T_FEMA_National_Risk_Index_$_.FEMAIndexRating'] || null;
           const populationValue = parseNumericValue(
             properties['T_CENSUS_Community_Resilience_Est$_.Total_population__excludes_adult_correctional_juvenile_facilitie']
           );
+          const geoid = properties['L0Census_Tracts.GEOID'];
+          const pred3PE = geoid ? pred3PEDataRef.current[geoid] : null;
 
           return {
             ...feature,
-            id: feature.id ?? properties['L0Census_Tracts.GEOID'] ?? index,
+            id: feature.id ?? geoid ?? index,
             properties: {
               ...properties,
-              __riskIndex: riskValue,
-              __population: populationValue
+              __riskRating: riskRating,
+              __population: populationValue,
+              __pred3PE: pred3PE !== null && pred3PE !== undefined ? pred3PE : null
             }
           };
         });
@@ -736,27 +837,36 @@ const App = () => {
           features: processedFeatures
         };
 
-        const riskValues = processedFeatures
-          .map(feature => feature.properties.__riskIndex)
-          .filter(value => Number.isFinite(value));
+        const riskRatings = processedFeatures
+          .map(feature => feature.properties.__riskRating)
+          .filter(value => value !== null && value !== undefined);
         const populationValues = processedFeatures
           .map(feature => feature.properties.__population)
           .filter(value => Number.isFinite(value));
+        const pred3PEValues = processedFeatures
+          .map(feature => feature.properties.__pred3PE)
+          .filter(value => value !== null && value !== undefined && Number.isFinite(value));
 
-        const riskStats = getRangeStats(riskValues);
+        // Get unique risk ratings for stats
+        const uniqueRatings = [...new Set(riskRatings)];
+        const riskStats = { ratings: uniqueRatings, count: riskRatings.length };
         const populationStats = getRangeStats(populationValues);
+        const pred3PEStats = getRangeStats(pred3PEValues);
 
-        const riskMissing = processedFeatures.length - riskValues.length;
+        const riskMissing = processedFeatures.length - riskRatings.length;
         const populationMissing = processedFeatures.length - populationValues.length;
+        const pred3PEMissing = processedFeatures.length - pred3PEValues.length;
 
         censusDataRef.current = processedGeojson;
         const statsPayload = {
           risk: riskStats,
           population: populationStats,
+          pred3PE: pred3PEStats,
           counts: {
             total: processedFeatures.length,
             missingRisk: riskMissing,
-            missingPopulation: populationMissing
+            missingPopulation: populationMissing,
+            missingPred3PE: pred3PEMissing
           }
         };
         censusStatsRef.current = statsPayload;
@@ -783,11 +893,11 @@ const App = () => {
 
         console.groupCollapsed('[Census] Census Tract Data Summary');
         console.log('Total tracts loaded:', processedFeatures.length);
-        console.log('FEMA Risk Index range:', riskStats.min, riskStats.max);
+        console.log('FEMA Risk Ratings found:', uniqueRatings);
         console.log('Population range:', populationStats.min, populationStats.max);
         if (riskMissing > 0) {
-          console.warn(`Missing FEMA Risk Index for ${riskMissing} tracts`, processedFeatures
-            .filter(feature => !Number.isFinite(feature.properties.__riskIndex))
+          console.warn(`Missing FEMA Risk Rating for ${riskMissing} tracts`, processedFeatures
+            .filter(feature => !feature.properties.__riskRating)
             .slice(0, 10)
             .map(feature => feature.properties['L0Census_Tracts.GEOID'] || feature.id));
         }
@@ -813,12 +923,12 @@ const App = () => {
     censusViewRef.current = activeCensusView;
     if (!map.current) return;
     const riskVisibility = censusVisible && activeCensusView === 'risk' ? 'visible' : 'none';
-    const populationVisibility = censusVisible && activeCensusView === 'population' ? 'visible' : 'none';
+    const pred3PEVisibility = censusVisible && activeCensusView === 'pred3pe' ? 'visible' : 'none';
     if (map.current.getLayer('census-tracts-risk')) {
       map.current.setLayoutProperty('census-tracts-risk', 'visibility', riskVisibility);
     }
-    if (map.current.getLayer('census-tracts-population')) {
-      map.current.setLayoutProperty('census-tracts-population', 'visibility', populationVisibility);
+    if (map.current.getLayer('census-tracts-pred3pe')) {
+      map.current.setLayoutProperty('census-tracts-pred3pe', 'visibility', pred3PEVisibility);
     }
     if (map.current.getLayer('census-tracts-outline')) {
       map.current.setLayoutProperty('census-tracts-outline', 'visibility', censusVisible ? 'visible' : 'none');
@@ -847,10 +957,18 @@ const App = () => {
     }
   }, [censusStats, censusLayersReady, addCensusSourceAndLayers]);
 
-  const legendStats = censusStats ? (activeCensusView === 'risk' ? censusStats.risk : censusStats.population) : null;
-  const legendColors = activeCensusView === 'risk'
-    ? ['#66BB6A', '#FF9800', '#C62828']
-    : ['#fff9c4', '#00ACC1', '#0D47A1'];
+  // Legend for risk ratings - More distinctive colors
+  const riskRatingColors = {
+    'Very Low': '#4CAF50',           // Bright Green
+    'Relatively Low': '#8BC34A',     // Lime Green
+    'Relatively Moderate': '#FFC107', // Amber/Yellow
+    'Relatively High': '#FF6F00',    // Red-Orange
+    'Very High': '#B71C1C'           // Dark Red
+  };
+  
+  const legendRatings = censusStats?.risk?.ratings || [];
+  const sortedRatings = ['Very Low', 'Relatively Low', 'Relatively Moderate', 'Relatively High', 'Very High']
+    .filter(rating => legendRatings.includes(rating));
 
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', overflow: 'hidden' }}>
@@ -1013,47 +1131,77 @@ const App = () => {
                   <input
                     type="radio"
                     name="census-view"
-                    value="population"
-                    checked={activeCensusView === 'population'}
-                    onChange={() => handleCensusViewChange('population')}
+                    value="pred3pe"
+                    checked={activeCensusView === 'pred3pe'}
+                    onChange={() => handleCensusViewChange('pred3pe')}
                   />
-                  Population
+                  PRED3_PE
                 </label>
               </div>
 
-              <div style={{
-                position: 'absolute',
-                right: '20px',
-                bottom: '70px',
-                zIndex: 1000,
-                background: 'rgba(255, 255, 255, 0.95)',
-                padding: '16px',
-                borderRadius: '8px',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
-                minWidth: '220px'
-              }}>
-                <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
-                  {activeCensusView === 'risk' ? 'FEMA Risk Index' : 'Population'}
+              {activeCensusView === 'risk' && sortedRatings.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  right: '20px',
+                  bottom: '70px',
+                  zIndex: 1000,
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                  minWidth: '220px'
+                }}>
+                  <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
+                    FEMA Risk Rating
+                  </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{
+                      width: '100%',
+                      height: '20px',
+                      borderRadius: '4px',
+                      background: 'linear-gradient(to right, #4CAF50 0%, #8BC34A 25%, #FFC107 50%, #FF6F00 75%, #B71C1C 100%)',
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      marginBottom: '8px'
+                    }}></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75em', color: '#546e7a' }}>
+                      <span>Very Low</span>
+                      <span>Very High</span>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '10px' }}>
-                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[0], border: '1px solid rgba(0,0,0,0.1)' }} />
-                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
-                    Low: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.min) : formatWithCommas(legendStats?.min != null ? Math.round(legendStats.min) : legendStats?.min)}
-                  </span>
+              )}
+
+              {activeCensusView === 'pred3pe' && censusStats?.pred3PE && (
+                <div style={{
+                  position: 'absolute',
+                  right: '20px',
+                  bottom: '70px',
+                  zIndex: 1000,
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                  minWidth: '220px'
+                }}>
+                  <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
+                    PRED3_PE (%)
+                  </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{
+                      width: '100%',
+                      height: '20px',
+                      borderRadius: '4px',
+                      background: 'linear-gradient(to right, #4CAF50 0%, #8BC34A 25%, #FFC107 50%, #FF6F00 75%, #B71C1C 100%)',
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      marginBottom: '8px'
+                    }}></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75em', color: '#546e7a' }}>
+                      <span>{censusStats.pred3PE.min?.toFixed(1) || '0'}%</span>
+                      <span>{censusStats.pred3PE.max?.toFixed(1) || '0'}%</span>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '10px' }}>
-                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[1], border: '1px solid rgba(0,0,0,0.1)' }} />
-                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
-                    Mid: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.mid) : formatWithCommas(legendStats?.mid != null ? Math.round(legendStats.mid) : legendStats?.mid)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[2], border: '1px solid rgba(0,0,0,0.1)' }} />
-                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
-                    High: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.max) : formatWithCommas(legendStats?.max != null ? Math.round(legendStats.max) : legendStats?.max)}
-                  </span>
-                </div>
-              </div>
+              )}
             </>
           )}
 
