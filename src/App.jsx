@@ -77,6 +77,28 @@ const getRangeStats = (values) => {
   return { min, mid, max };
 };
 
+// Create a small circle polygon around a point to use as a buffer zone
+const createCircleBuffer = (center, radiusInMeters = 50) => {
+  const [lng, lat] = center;
+  const points = 32; // Number of points in the circle
+  const circle = [];
+  
+  for (let i = 0; i <= points; i++) {
+    const angle = (i * 360) / points;
+    const dx = radiusInMeters * Math.cos((angle * Math.PI) / 180);
+    const dy = radiusInMeters * Math.sin((angle * Math.PI) / 180);
+    
+    // Approximate conversion: 1 degree latitude ≈ 111,000 meters
+    // 1 degree longitude ≈ 111,000 * cos(latitude) meters
+    const latOffset = dy / 111000;
+    const lngOffset = dx / (111000 * Math.cos((lat * Math.PI) / 180));
+    
+    circle.push([lng + lngOffset, lat + latOffset]);
+  }
+  
+  return circle;
+};
+
 const formatWithCommas = (value) => {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
   return new Intl.NumberFormat('en-US').format(value);
@@ -96,6 +118,7 @@ const App = () => {
   const censusStatsRef = useRef(null);
   const censusViewRef = useRef('risk');
   const pred3PEDataRef = useRef({}); // Mapping of GEOID to PRED3_PE values
+  const isHoveringMarkerRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [allMarkers, setAllMarkers] = useState([]);
@@ -414,11 +437,54 @@ const App = () => {
       map.current.setLayoutProperty('census-tracts-outline', 'visibility', outlineVisibility);
     }
 
+    // Add marker buffer layer above census layers if it exists
+    if (map.current.getSource('marker-buffers') && !map.current.getLayer('marker-buffers')) {
+      map.current.addLayer({
+        id: 'marker-buffers',
+        type: 'fill',
+        source: 'marker-buffers',
+        paint: {
+          'fill-color': 'transparent',
+          'fill-opacity': 0
+        }
+      });
+
+      // Add event handlers to buffer layer to prevent census hover
+      map.current.on('mouseenter', 'marker-buffers', () => {
+        isHoveringMarkerRef.current = true;
+        if (hoveredCensusIdRef.current !== null && map.current) {
+          map.current.setFeatureState(
+            { source: 'census-tracts', id: hoveredCensusIdRef.current },
+            { hover: false }
+          );
+          hoveredCensusIdRef.current = null;
+        }
+      });
+
+      map.current.on('mouseleave', 'marker-buffers', () => {
+        isHoveringMarkerRef.current = false;
+      });
+
+      map.current.on('mousemove', 'marker-buffers', () => {
+        isHoveringMarkerRef.current = true;
+        if (hoveredCensusIdRef.current !== null && map.current) {
+          map.current.setFeatureState(
+            { source: 'census-tracts', id: hoveredCensusIdRef.current },
+            { hover: false }
+          );
+          hoveredCensusIdRef.current = null;
+        }
+      });
+    }
+
     if (!censusEventsBoundRef.current) {
       const censusLayerIds = ['census-tracts-risk', 'census-tracts-pred3pe'];
 
       const handleHover = (e) => {
         if (!map.current) return;
+        // Don't activate census hover if we're hovering over a marker
+        if (isHoveringMarkerRef.current) return;
+        
         const feature = e.features && e.features[0];
         if (!feature || feature.id === undefined || feature.id === null) return;
 
@@ -699,7 +765,7 @@ const App = () => {
       }
 
       try {
-        const response = await fetch('/project_inventory_database.geojson');
+        const response = await fetch('/Updated_Data_Resilience_Projects_11.25.geojson');
 
         if (!response.ok) {
           throw new Error(`Failed to load project data: ${response.status}`);
@@ -713,6 +779,36 @@ const App = () => {
           data: data
         });
 
+        // Create invisible buffer zones around each marker
+        const bufferFeatures = data.features.map((feature, index) => {
+          const coordinates = feature.geometry.coordinates;
+          const circleCoords = createCircleBuffer(coordinates, 30); // 30 meter radius buffer
+          return {
+            type: 'Feature',
+            id: `marker-buffer-${index}`,
+            geometry: {
+              type: 'Polygon',
+              coordinates: [circleCoords]
+            },
+            properties: {
+              markerIndex: index
+            }
+          };
+        });
+
+        const bufferGeoJSON = {
+          type: 'FeatureCollection',
+          features: bufferFeatures
+        };
+
+        // Add buffer zones as an invisible layer to intercept mouse events
+        map.current.addSource('marker-buffers', {
+          type: 'geojson',
+          data: bufferGeoJSON
+        });
+
+        // Buffer layer will be added in addCensusSourceAndLayers after census layers
+
         const markers = [];
         data.features.forEach(feature => {
           const coordinates = feature.geometry.coordinates;
@@ -720,12 +816,33 @@ const App = () => {
 
           const marker = new mapboxgl.Marker({
             color: getMarkerColor(properties['Type']),
-            scale: getMarkerSize(properties['Esimated Project Cost']) / 10
+            scale: 1.0
           })
             .setLngLat(coordinates);
 
-          marker.getElement().addEventListener('click', () => {
+          marker.getElement().addEventListener('click', (e) => {
+            e.stopPropagation();
             setActiveFeature(feature);
+          });
+
+          marker.getElement().addEventListener('mouseenter', (e) => {
+            e.stopPropagation();
+            // Set flag to prevent census hover
+            isHoveringMarkerRef.current = true;
+            // Clear any active census hover state
+            if (hoveredCensusIdRef.current !== null && map.current) {
+              map.current.setFeatureState(
+                { source: 'census-tracts', id: hoveredCensusIdRef.current },
+                { hover: false }
+              );
+              hoveredCensusIdRef.current = null;
+            }
+          });
+
+          marker.getElement().addEventListener('mouseleave', (e) => {
+            e.stopPropagation();
+            // Clear flag to allow census hover again
+            isHoveringMarkerRef.current = false;
           });
 
           marker.addTo(map.current);
@@ -1368,9 +1485,9 @@ const MapboxPopup = ({ map, activeFeature }) => {
             </tr>
           </tbody>
         </table>
-        {props['Brief Description of the Project'] && (
+        {props['New 15-25 Words Project Description'] && (
           <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #ecf0f1', color: '#7f8c8d', fontSize: '0.85em', lineHeight: 1.4 }}>
-            {props['Brief Description of the Project']}
+            {props['New 15-25 Words Project Description']}
           </div>
         )}
       </div>,
