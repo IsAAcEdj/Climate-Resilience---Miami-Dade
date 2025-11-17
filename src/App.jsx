@@ -132,6 +132,9 @@ const App = () => {
   const [censusVisible, setCensusVisible] = useState(true);
   const censusEventsBoundRef = useRef(false);
   const censusVisibleRef = useRef(true);
+  const [selectedTypes, setSelectedTypes] = useState([]);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedDisasterFocus, setSelectedDisasterFocus] = useState([]);
 
   const handleCensusViewChange = (view) => {
     censusViewRef.current = view;
@@ -148,10 +151,12 @@ const App = () => {
   // Get marker color based on project type
   const getMarkerColor = (projectType) => {
     switch(projectType) {
-      case 'Green Infrastructure':
-        return '#e74c3c';
-      case 'Grey Infrastructure':
+      case 'Blue Infrastructure':
         return '#3498db';
+      case 'Green Infrastructure':
+        return '#27ae60';
+      case 'Grey Infrastructure':
+        return '#95a5a6';
       default:
         return '#95a5a6';
     }
@@ -1087,8 +1092,48 @@ const App = () => {
   const sortedRatings = ['Very Low', 'Relatively Low', 'Relatively Moderate', 'Relatively High', 'Very High']
     .filter(rating => legendRatings.includes(rating));
 
+  // Extract unique values for filters
+  const getUniqueValues = (field) => {
+    if (!allProjectsData?.features) return [];
+    const values = allProjectsData.features
+      .map(f => f.properties?.[field])
+      .filter(v => v && v !== null && v !== undefined && v !== 'Null')
+      .filter((v, i, arr) => arr.indexOf(v) === i)
+      .sort();
+    return values;
+  };
+
+  const uniqueTypes = getUniqueValues('Type');
+  const uniqueCategories = getUniqueValues('Categories');
+  const uniqueDisasterFocus = getUniqueValues('Disaster Focus');
+
+  // Filter markers based on selected filters
+  useEffect(() => {
+    if (!allMarkers.length || !map.current) return;
+
+    allMarkers.forEach(marker => {
+      if (!marker.feature) return;
+      const props = marker.feature.properties || {};
+      const type = props['Type'];
+      const category = props['Categories'];
+      const disasterFocus = props['Disaster Focus'];
+
+      const typeMatch = selectedTypes.length === 0 || selectedTypes.includes(type);
+      const categoryMatch = selectedCategories.length === 0 || selectedCategories.includes(category);
+      const disasterMatch = selectedDisasterFocus.length === 0 || selectedDisasterFocus.includes(disasterFocus);
+
+      const shouldShow = typeMatch && categoryMatch && disasterMatch;
+
+      if (shouldShow) {
+        marker.getElement().style.display = 'block';
+      } else {
+        marker.getElement().style.display = 'none';
+      }
+    });
+  }, [selectedTypes, selectedCategories, selectedDisasterFocus, allMarkers]);
+
   return (
-    <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', width: '100%', overflow: 'hidden', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
       <div style={{ 
         background: "#01321e", 
         color: 'white', 
@@ -1096,7 +1141,8 @@ const App = () => {
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)' 
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        flexShrink: 0
       }}>
         <div>
           <h1 style={{ 
@@ -1140,7 +1186,7 @@ const App = () => {
 
       
 
-      <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
+      <div style={{ display: 'flex', flex: 1, width: '100%', overflow: 'hidden', boxSizing: 'border-box', minHeight: 0 }}>
 <aside style={{
           width: '30%',
           minWidth: '300px',
@@ -1157,25 +1203,136 @@ const App = () => {
             color: '#1b3a4b', 
             marginBottom: '20px' 
           }}>
-            Filler
+            Filter Projects
           </h2>
           
+          {/* Type Filter */}
           <div style={{ marginBottom: '24px' }}>
             <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
-              Filler
+              Type
             </h3>
-            <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
-              Add content
-            </p>
+            <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+              {uniqueTypes.map(type => (
+                <label key={type} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTypes.includes(type)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedTypes([...selectedTypes, type]);
+                      } else {
+                        setSelectedTypes(selectedTypes.filter(t => t !== type));
+                      }
+                    }}
+                    style={{ marginRight: '8px', cursor: 'pointer' }}
+                  />
+                  <span style={{ color: '#546e7a', fontSize: '0.9em' }}>{type}</span>
+                </label>
+              ))}
+            </div>
+            {selectedTypes.length > 0 && (
+              <button
+                onClick={() => setSelectedTypes([])}
+                style={{
+                  marginTop: '8px',
+                  padding: '4px 8px',
+                  fontSize: '0.85em',
+                  background: 'transparent',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  color: '#546e7a'
+                }}
+              >
+                Clear
+              </button>
+            )}
           </div>
 
+          {/* Categories Filter */}
           <div style={{ marginBottom: '24px' }}>
             <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
-              Filler
+              Categories
             </h3>
-            <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
-              Add content
-            </p>
+            <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+              {uniqueCategories.map(category => (
+                <label key={category} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(category)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedCategories([...selectedCategories, category]);
+                      } else {
+                        setSelectedCategories(selectedCategories.filter(c => c !== category));
+                      }
+                    }}
+                    style={{ marginRight: '8px', cursor: 'pointer' }}
+                  />
+                  <span style={{ color: '#546e7a', fontSize: '0.9em' }}>{category}</span>
+                </label>
+              ))}
+            </div>
+            {selectedCategories.length > 0 && (
+              <button
+                onClick={() => setSelectedCategories([])}
+                style={{
+                  marginTop: '8px',
+                  padding: '4px 8px',
+                  fontSize: '0.85em',
+                  background: 'transparent',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  color: '#546e7a'
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Disaster Focus Filter */}
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+              Disaster Focus
+            </h3>
+            <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+              {uniqueDisasterFocus.map(focus => (
+                <label key={focus} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedDisasterFocus.includes(focus)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedDisasterFocus([...selectedDisasterFocus, focus]);
+                      } else {
+                        setSelectedDisasterFocus(selectedDisasterFocus.filter(f => f !== focus));
+                      }
+                    }}
+                    style={{ marginRight: '8px', cursor: 'pointer' }}
+                  />
+                  <span style={{ color: '#546e7a', fontSize: '0.9em' }}>{focus}</span>
+                </label>
+              ))}
+            </div>
+            {selectedDisasterFocus.length > 0 && (
+              <button
+                onClick={() => setSelectedDisasterFocus([])}
+                style={{
+                  marginTop: '8px',
+                  padding: '4px 8px',
+                  fontSize: '0.85em',
+                  background: 'transparent',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  color: '#546e7a'
+                }}
+              >
+                Clear
+              </button>
+            )}
           </div>
         </aside>
 
@@ -1183,8 +1340,8 @@ const App = () => {
         
 
 
-        <div style={{ flex: 1, position: 'relative', height: '100%' }}>
-          <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
+        <div style={{ flex: 1, position: 'relative', height: '100%', width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
+          <div ref={mapContainer} style={{ width: '100%', height: '100%', overflow: 'hidden', boxSizing: 'border-box' }} />
           {map.current && (
             <MapboxPopup map={map.current} activeFeature={activeFeature} />
           )}
