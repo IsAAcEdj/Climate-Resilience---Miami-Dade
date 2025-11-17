@@ -1,19 +1,101 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
+
+
+const parseNumericValue = (value) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const cleaned = String(value).replace(/[^0-9eE.+-]/g, '');
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toWgs84Coordinate = ([x, y]) => {
+  const originShift = 20037508.34;
+  const lon = (x / originShift) * 180;
+  let lat = (y / originShift) * 180;
+  lat = (180 / Math.PI) * (2 * Math.atan(Math.exp((lat * Math.PI) / 180)) - Math.PI / 2);
+  return [lon, lat];
+};
+
+const transformToWgs84 = (coords) => {
+  if (!Array.isArray(coords)) return coords;
+  if (typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+    return toWgs84Coordinate(coords);
+  }
+  return coords.map(transformToWgs84);
+};
+
+const walkCoordinates = (geometry, callback) => {
+  if (!geometry || !geometry.coordinates) return;
+  const traverse = (coords) => {
+    if (!Array.isArray(coords)) return;
+    if (typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+      callback(coords);
+      return;
+    }
+    coords.forEach(traverse);
+  };
+  traverse(geometry.coordinates);
+};
+
+const reprojectFeatureCollectionIfNeeded = (featureCollection) => {
+  if (!featureCollection?.features?.length) return featureCollection;
+  let firstCoord = null;
+  for (const feature of featureCollection.features) {
+    if (!feature?.geometry) continue;
+    walkCoordinates(feature.geometry, (coord) => {
+      if (!firstCoord) firstCoord = coord;
+    });
+    if (firstCoord) break;
+  }
+  if (!firstCoord) return featureCollection;
+  const needsReprojection = Math.abs(firstCoord[0]) > 180 || Math.abs(firstCoord[1]) > 90;
+  if (!needsReprojection) return featureCollection;
+  console.info('[Census] Reprojecting GeoJSON from EPSG:3857 to EPSG:4326');
+  return {
+    ...featureCollection,
+    features: featureCollection.features.map((feature) => {
+      if (!feature?.geometry) return feature;
+      return {
+        ...feature,
+        geometry: {
+          ...feature.geometry,
+          coordinates: transformToWgs84(feature.geometry.coordinates)
+        }
+      };
+    })
+  };
+};
+
+const getRangeStats = (values) => {
+  if (!values.length) return { min: null, mid: null, max: null };
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const mid = min + (max - min) / 2;
+  return { min, mid, max };
+};
+
+const formatWithCommas = (value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  return new Intl.NumberFormat('en-US').format(value);
+};
+
+const formatRiskValue = (value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  return value.toFixed(2);
+};
 
 const App = () => {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const districtsRef = useRef({});
-<<<<<<< Updated upstream
-=======
   const censusDataRef = useRef(null);
   const hoveredCensusIdRef = useRef(null);
   const censusStatsRef = useRef(null);
   const censusViewRef = useRef('risk');
-  const pred3PEDataRef = useRef({});
->>>>>>> Stashed changes
+  const pred3PEDataRef = useRef({}); // Mapping of GEOID to PRED3_PE values
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [allMarkers, setAllMarkers] = useState([]);
@@ -21,20 +103,13 @@ const App = () => {
   const [allProjectsData, setAllProjectsData] = useState(null);
   const [isSatelliteView, setIsSatelliteView] = useState(false);
   const [activeFeature, setActiveFeature] = useState(null);
-<<<<<<< Updated upstream
-=======
   const [censusStats, setCensusStats] = useState(null);
   const [censusLayersReady, setCensusLayersReady] = useState(false);
   const [activeCensusView, setActiveCensusView] = useState('risk');
   const [censusVisible, setCensusVisible] = useState(true);
-  const [selectedElement, setSelectedElement] = useState(null);
   const censusEventsBoundRef = useRef(false);
   const censusVisibleRef = useRef(true);
-<<<<<<< Updated upstream
-  const citiesVisible = true;
-=======
   const mapBounds = [[-81.018698, 25.077495],[-79.501861, 26.326954]];
->>>>>>> Stashed changes
 
   const handleCensusViewChange = (view) => {
     censusViewRef.current = view;
@@ -42,15 +117,8 @@ const App = () => {
   };
 
   const handleCensusVisibilityToggle = () => {
-    if(citiesVisible){
-      map.setLayoutProperty('districtsRef', 'visibility', 'none');
-      citiesVisible = false;
-    } else {
-      map.setLayoutProperty('districtsRef', 'visibility', 'visible');
-      citiesVisible = true;
-    }
     setCensusVisible((prev) => !prev);
-    if(!censusVisible){
+        if(!censusVisible){
       Object.keys(districtsRef.current).forEach(districtId => {
         map.current.setLayoutProperty(`${districtId}-fill`, 'visibility', 'none');
         map.current.setLayoutProperty(`${districtId}-outline`, 'visibility', 'none');
@@ -62,8 +130,9 @@ const App = () => {
       });
     }
   };
->>>>>>> Stashed changes
+  
 
+  // Get marker color based on project type
   const getMarkerColor = (projectType) => {
     switch(projectType) {
       case 'Green Infrastructure':
@@ -75,6 +144,7 @@ const App = () => {
     }
   };
 
+  // Get marker size based on project cost
   const getMarkerSize = (cost) => {
     if (!cost) return 8;
     const numericCost = parseFloat(cost.replace(/[$,]/g, ''));
@@ -83,53 +153,10 @@ const App = () => {
     return 8;
   };
 
-<<<<<<< Updated upstream
-  // Create popup content
-  const createPopupContent = (feature) => {
-    const props = feature.properties;
-    const cost = feature.properties['Estimated Project Cost'] ?? 'Not disclosed';
-    const status = feature.properties['Project Status'] || 'Unknown';
-    return `
-      <div style="padding: 15px; min-width: 280px;">
-        <div style="font-size: 1.2em; font-weight: bold; color: #2c3e50; margin-bottom: 12px; line-height: 1.3;">
-          ${props['Project Name']}
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Type:</span>
-          <span style="color: #2c3e50;">${props['Type']}</span>
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Category:</span>
-          <span style="color: #2c3e50;">${props['Categories']}</span>
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Focus:</span>
-          <span style="color: #2c3e50;">${props['Disaster Focus']}</span>
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">City:</span>
-          <span style="color: #2c3e50;">${props['City']}</span>
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Status:</span>
-          <span style="color: ${status.toLowerCase() === 'completed' ? '#27ae60' : '#f39c12'}; font-weight: bold;">${status}</span>
-        </div>
-        <div style="margin-bottom: 8px; font-size: 0.9em;">
-          <span style="font-weight: bold; color: #34495e; display: inline-block; width: 80px;">Cost:</span>
-          <span style="color: #27ae60; font-weight: bold;">${cost}</span>
-        </div>
-        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ecf0f1; font-size: 0.85em; color: #7f8c8d; line-height: 1.4;">
-          ${props['Brief Description of the Project']}
-        </div>
-      </div>
-    `;
-  };
 
   
 
   // Check if point is within district
-=======
->>>>>>> Stashed changes
   const isPointInDistrict = (point, districtCoords) => {
     const [lng, lat] = point;
     let inside = false;
@@ -146,6 +173,7 @@ const App = () => {
     return inside;
   };
 
+  // Zoom to district
   const zoomToDistrict = (districtId) => {
     const district = districtsRef.current[districtId];
     if (!district || !map.current) return;
@@ -195,15 +223,12 @@ const App = () => {
     });
   };
 
+  // Reset view
   const resetView = () => {
     if (!map.current) return;
     
     setCurrentDistrict(null);
-<<<<<<< Updated upstream
-=======
-    setSelectedElement(null);
     handleCensusViewChange('risk');
->>>>>>> Stashed changes
 
     Object.keys(districtsRef.current).forEach(id => {
       map.current.setPaintProperty(`${id}-fill`, 'fill-opacity', 0.1);
@@ -219,14 +244,227 @@ const App = () => {
 
     map.current.flyTo({
       center: [-80.6327, 25.5516],
-      zoom: 8,
+      zoom: 11,
       duration: 1500
     });
   };
 
-<<<<<<< Updated upstream
+
+
+
+ 
+    const riskColorExpression = buildRiskRatingColorExpression();
+    
+    // Build color expression for PRED3_PE (percentage values)
+    const buildPred3PEColorExpression = () => {
+      const pred3PEStats = stats.pred3PE;
+      if (!pred3PEStats || pred3PEStats.min === null || pred3PEStats.max === null) {
+        return [
+          'case',
+          ['==', ['typeof', ['get', '__pred3PE']], 'number'],
+          '#9e9e9e',
+          '#9e9e9e'
+        ];
+      }
+      if (pred3PEStats.min === pred3PEStats.max) {
+        return [
+          'case',
+          ['==', ['typeof', ['get', '__pred3PE']], 'number'],
+          '#4CAF50',
+          '#9e9e9e'
+        ];
+      }
+      // Color gradient from green (low) to red (high)
+      return [
+        'case',
+        ['==', ['typeof', ['get', '__pred3PE']], 'number'],
+        [
+          'interpolate',
+          ['linear'],
+          ['get', '__pred3PE'],
+          pred3PEStats.min, '#4CAF50',  // Green for low values
+          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.25, '#8BC34A',  // Lime green
+          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.5, '#FFC107',  // Amber
+          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.75, '#FF6F00',  // Red-orange
+          pred3PEStats.max, '#B71C1C'  // Dark red for high values
+        ],
+        '#9e9e9e'
+      ];
+    };
+
+    const pred3PEColorExpression = buildPred3PEColorExpression();
+    const isVisible = censusVisibleRef.current;
+    const riskVisibility = view === 'risk' && isVisible ? 'visible' : 'none';
+    const pred3PEVisibility = view === 'pred3pe' && isVisible ? 'visible' : 'none';
+    const outlineVisibility = isVisible ? 'visible' : 'none';
+
+    if (map.current.getSource('census-tracts')) {
+      map.current.getSource('census-tracts').setData(censusDataRef.current);
+    } else {
+      map.current.addSource('census-tracts', {
+        type: 'geojson',
+        data: censusDataRef.current
+      });
+    }
+
+    if (!map.current.getLayer('census-tracts-risk')) {
+      map.current.addLayer({
+        id: 'census-tracts-risk',
+        type: 'fill',
+        source: 'census-tracts',
+        layout: {
+          visibility: riskVisibility
+        },
+        paint: {
+          'fill-color': riskColorExpression,
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.7,
+            0.5
+          ]
+        }
+      });
+    } else {
+      map.current.setPaintProperty('census-tracts-risk', 'fill-color', riskColorExpression);
+      map.current.setLayoutProperty('census-tracts-risk', 'visibility', riskVisibility);
+    }
+
+    // Add PRED3_PE layer
+    if (!map.current.getLayer('census-tracts-pred3pe')) {
+      map.current.addLayer({
+        id: 'census-tracts-pred3pe',
+        type: 'fill',
+        source: 'census-tracts',
+        layout: {
+          visibility: pred3PEVisibility
+        },
+        paint: {
+          'fill-color': pred3PEColorExpression,
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.7,
+            0.5
+          ]
+        }
+      });
+    } else {
+      map.current.setPaintProperty('census-tracts-pred3pe', 'fill-color', pred3PEColorExpression);
+      map.current.setLayoutProperty('census-tracts-pred3pe', 'visibility', pred3PEVisibility);
+    }
+
+    // Removed: census-tracts-population layer - population layer disabled
+    /* if (!map.current.getLayer('census-tracts-population')) {
+      map.current.addLayer({
+        id: 'census-tracts-population',
+        type: 'fill',
+        source: 'census-tracts',
+        layout: {
+          visibility: populationVisibility
+        },
+        paint: {
+          'fill-color': populationColorExpression,
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.8,
+            0.6
+          ]
+        }
+      });
+    } else {
+      map.current.setPaintProperty('census-tracts-population', 'fill-color', populationColorExpression);
+      map.current.setLayoutProperty('census-tracts-population', 'visibility', populationVisibility);
+    } */
+
+    if (!map.current.getLayer('census-tracts-outline')) {
+      map.current.addLayer({
+        id: 'census-tracts-outline',
+        type: 'line',
+        source: 'census-tracts',
+        layout: {
+          visibility: outlineVisibility
+        },
+        paint: {
+          'line-color': '#777777',
+          'line-width': 1,
+          'line-opacity': 0.6
+        }
+      });
+    } else {
+      map.current.setLayoutProperty('census-tracts-outline', 'visibility', outlineVisibility);
+    }
+
+    if (!censusEventsBoundRef.current) {
+      const censusLayerIds = ['census-tracts-risk', 'census-tracts-pred3pe'];
+
+      const handleHover = (e) => {
+        if (!map.current) return;
+        const feature = e.features && e.features[0];
+        if (!feature || feature.id === undefined || feature.id === null) return;
+
+        if (hoveredCensusIdRef.current !== null) {
+          map.current.setFeatureState(
+            { source: 'census-tracts', id: hoveredCensusIdRef.current },
+            { hover: false }
+          );
+        }
+
+        hoveredCensusIdRef.current = feature.id;
+        map.current.setFeatureState(
+          { source: 'census-tracts', id: hoveredCensusIdRef.current },
+          { hover: true }
+        );
+      };
+
+      const handleLeave = () => {
+        if (!map.current) return;
+        if (hoveredCensusIdRef.current !== null) {
+          map.current.setFeatureState(
+            { source: 'census-tracts', id: hoveredCensusIdRef.current },
+            { hover: false }
+          );
+        }
+        hoveredCensusIdRef.current = null;
+        map.current.getCanvas().style.cursor = '';
+      };
+
+      const handleClick = (e) => {
+        if (!map.current) return;
+        const feature = e.features && e.features[0];
+        if (!feature) return;
+        const props = feature.properties || {};
+        const tractName = props['L0Census_Tracts.NAME'] || 'Census Tract';
+        const tractId = props['L0Census_Tracts.GEOID'] || feature.id || 'N/A';
+        const riskRating = props['__riskRating'] || props['T_FEMA_National_Risk_Index_$_.FEMAIndexRating'] || 'Not Rated';
+        const pred3PE = props['__pred3PE'];
+        // Removed: riskIndexRaw - only showing rating now
+
+        new mapboxgl.Popup({ closeButton: true, closeOnClick: true })
+          .setLngLat(e.lngLat)
+          .setHTML(popupHtml)
+          .addTo(map.current);
+      };
+
+      censusLayerIds.forEach((layerId) => {
+        map.current.on('click', layerId, handleClick);
+        map.current.on('mouseenter', layerId, () => {
+          if (map.current) {
+            map.current.getCanvas().style.cursor = 'pointer';
+          }
+        });
+        map.current.on('mousemove', layerId, handleHover);
+        map.current.on('mouseleave', layerId, handleLeave);
+      });
+
+      censusEventsBoundRef.current = true;
+    }
+
+    setCensusLayersReady(true);
+  }, [];
+
   // Toggle between satellite and standard map
-=======
   const addCensusSourceAndLayers = useCallback(() => {
     if (!map.current || !censusDataRef.current) return;
 
@@ -448,21 +686,14 @@ const App = () => {
     setCensusLayersReady(true);
   }, []);
 
->>>>>>> Stashed changes
   const toggleMapStyle = () => {
     if (!map.current) return;
     
     const newStyle = isSatelliteView ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/satellite-v9';
     
     map.current.once('styledata', () => {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-      // Re-add district polygons after style change
-      Object.keys(districtsRef.current).forEach(districtId => {
-=======
       // Commented out: Re-add district polygons after style change (miami_cities.geojson)
-       Object.keys(districtsRef.current).forEach(districtId => {
->>>>>>> Stashed changes
+      /* Object.keys(districtsRef.current).forEach(districtId => {
         const district = districtsRef.current[districtId];
         
         if (!map.current.getSource(districtId)) {
@@ -515,17 +746,16 @@ const App = () => {
         map.current.on('mouseleave', `${districtId}-fill`, () => {
           map.current.getCanvas().style.cursor = '';
         });
-      });
+      }); */
 
       // Re-add project markers
-=======
-      
->>>>>>> Stashed changes
       if (allProjectsData) {
         allMarkers.forEach(marker => {
           marker.addTo(map.current);
         });
       }
+
+      addCensusSourceAndLayers();
     });
     
     map.current.setStyle(newStyle);
@@ -537,7 +767,7 @@ const App = () => {
 
     mapboxgl.accessToken = 'pk.eyJ1IjoiaXNhYWNlZGoiLCJhIjoiY21naTVhc3ZkMDVtbjJzcHBwdnFuOW44MSJ9.3B7ShXPP1-_51v1sFoVMKA';
     
-    const compileDistricts = async () => {
+    const loadDistricts = async () => {
     try {
       const response = await fetch('/miami_cities.geojson');
       const geojson = await response.json();
@@ -554,10 +784,8 @@ const App = () => {
           lat: lats.reduce((a, b) => a + b) / lats.length
         };
         const districtId = feature.properties['OBJECTID'];
-        const order = feature.properties['order'];
         const cn = Math.pow(-(Math.min(...lngs) - Math.max(...lngs)), 0.12);
         const cs = Math.pow(-(Math.min(...lats) - Math.max(...lats)), 0.12);
-        let isSelected = false;
         let cf = 0;
         if(cn > cs) {
           cf = cn;
@@ -570,19 +798,17 @@ const App = () => {
           name,
           coordinates,
           zoom,
-          center,
-          isSelected,
-          order
+          center
         }
        {}});
       districtsRef.current = districts;
     }catch(err) {
-      console.error('Error compiling cities:', err);
+      console.error('Error loading cities:', err);
     }
     }
 
     const init = async () => {
-      await compileDistricts();
+      await loadDistricts();
     };
 
     init();
@@ -591,7 +817,7 @@ const App = () => {
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/light-v11',
       center: [-80.6327, 25.5516],
-      zoom: 11,
+      zoom: 9,
       maxBounds: mapBounds,
       bounds: mapBounds
     });
@@ -604,16 +830,10 @@ const App = () => {
     }));
 
     map.current.on('load', async () => {
-<<<<<<< Updated upstream
       try {
-        // Add district polygons
-        Object.keys(districtsRef.current).forEach(districtId => {
-=======
-        try {
-         Object.keys(districtsRef.current).forEach(districtId => {
->>>>>>> Stashed changes
+  Object.keys(districtsRef.current).forEach(districtId => {
           const district = districtsRef.current[districtId];
-          
+
           map.current.addSource(districtId, {
             type: 'geojson',
             data: {
@@ -646,9 +866,11 @@ const App = () => {
             }
           });
 
+          map.current.setLayoutProperty(`${districtId}-fill`, 'visibility', 'none');
+          map.current.setLayoutProperty(`${districtId}-outline`, 'visibility', 'none');
+
           map.current.on('click', `${districtId}-fill`, () => {
             zoomToDistrict(districtId);
-            console.log(districtId);
           });
 
           map.current.on('mouseenter', `${districtId}-fill`, () => {
@@ -658,76 +880,14 @@ const App = () => {
           map.current.on('mouseleave', `${districtId}-fill`, () => {
             map.current.getCanvas().style.cursor = '';
           });
-<<<<<<< Updated upstream
         });
-
-        // Try to load GeoJSON data
-        try {
-          const response = await fetch('/project_inventory_database.geojson');
-          
-          if (!response.ok) {
-            throw new Error(`Failed to load project data: ${response.status}`);
-          }
-          
-          const data = await response.json();
-          setAllProjectsData(data);
-
-          map.current.addSource('projects', {
-            type: 'geojson',
-            data: data
-          });
-
-          const markers = [];
-          data.features.forEach(feature => {
-            const coordinates = feature.geometry.coordinates;
-            const properties = feature.properties;
-            
-            const marker = new mapboxgl.Marker({
-              color: getMarkerColor(properties['Type']),
-              scale: getMarkerSize(properties['Esimated Project Cost']) / 10
-            })
-          .setLngLat(coordinates);
-
-          marker.getElement().addEventListener('click', () => {
-            setActiveFeature(feature);
-            console.log(feature.properties['Estimated Project Cost']);
-          });
-            
-            marker.addTo(map.current);
-            marker.feature = feature;
-            markers.push(marker);
-          });
-
-          setAllMarkers(markers);
-
-          const bounds = new mapboxgl.LngLatBounds();
-          data.features.forEach(feature => {
-            bounds.extend(feature.geometry.coordinates);
-          });
-          map.current.fitBounds(bounds, { padding: 50 });
-
-          setLoading(false);
-        } catch (err) {
-          console.error('Error loading project data:', err);
-          setError('Unable to load project data. Please ensure the GeoJSON file is available or use a CORS proxy.');
-          setLoading(false);
-        }
-=======
-        map.current.setLayoutProperty(`${districtId}-fill`, 'visibility', 'none');
-        map.current.setLayoutProperty(`${districtId}-outline`, 'visibility', 'none');
-        });
->>>>>>> Stashed changes
       } catch (err) {
         console.error('Map initialization error:', err);
         setError('Error initializing map');
         setLoading(false);
       }
-<<<<<<< Updated upstream
-    });
-  }, []);
-=======
+
       try {
-      
         const response = await fetch('/project_inventory_database.geojson');
 
         if (!response.ok) {
@@ -779,12 +939,14 @@ const App = () => {
         setLoading(false);
       }
 
+      // Load FL_CRE.csv data
       try {
         const csvResponse = await fetch('/FL_CRE.csv');
         if (csvResponse.ok) {
           const csvText = await csvResponse.text();
           const lines = csvText.split('\n').filter(line => line.trim());
           
+          // Simple CSV parser that handles quoted fields
           const parseCSVLine = (line) => {
             const result = [];
             let current = '';
@@ -817,6 +979,7 @@ const App = () => {
               const pred3PE = parseFloat(values[pred3PEIndex]?.trim());
               
               if (geoId && !isNaN(pred3PE)) {
+                // Convert "1400000US12086000107" to "12086000107"
                 const geoid = geoId.replace('1400000US', '');
                 pred3PEMap[geoid] = pred3PE;
               }
@@ -873,6 +1036,7 @@ const App = () => {
           .map(feature => feature.properties.__pred3PE)
           .filter(value => value !== null && value !== undefined && Number.isFinite(value));
 
+        // Get unique risk ratings for stats
         const uniqueRatings = [...new Set(riskRatings)];
         const riskStats = { ratings: uniqueRatings, count: riskRatings.length };
         const populationStats = getRangeStats(populationValues);
@@ -982,18 +1146,18 @@ const App = () => {
     }
   }, [censusStats, censusLayersReady, addCensusSourceAndLayers]);
 
+  // Legend for risk ratings - More distinctive colors
   const riskRatingColors = {
-    'Very Low': '#4CAF50',
-    'Relatively Low': '#8BC34A',
-    'Relatively Moderate': '#FFC107',
-    'Relatively High': '#FF6F00',
-    'Very High': '#B71C1C'
+    'Very Low': '#4CAF50',           // Bright Green
+    'Relatively Low': '#8BC34A',     // Lime Green
+    'Relatively Moderate': '#FFC107', // Amber/Yellow
+    'Relatively High': '#FF6F00',    // Red-Orange
+    'Very High': '#B71C1C'           // Dark Red
   };
   
   const legendRatings = censusStats?.risk?.ratings || [];
   const sortedRatings = ['Very Low', 'Relatively Low', 'Relatively Moderate', 'Relatively High', 'Very High']
     .filter(rating => legendRatings.includes(rating));
->>>>>>> Stashed changes
 
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', overflow: 'hidden' }}>
@@ -1008,7 +1172,7 @@ const App = () => {
       }}>
         <div>
           <h1 style={{ 
-            fontSize: '1.8em', 
+            fontSize: '2em', 
             margin: '0', 
             fontWeight: 300,
             fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
@@ -1031,7 +1195,7 @@ const App = () => {
             src="/Images/1019px-NSF_logo.png" 
             alt="NSF Logo" 
             style={{ 
-              height: '65px', 
+              height: '75px', 
               width: 'auto'
             }} 
           />
@@ -1039,71 +1203,17 @@ const App = () => {
             src="/Images/Miami_Hurricanes_logo.svg.png" 
             alt="Miami Hurricanes Logo" 
             style={{ 
-              height: '45px', 
+              height: '50px', 
               width: 'auto'
             }} 
           />
         </div>
-<<<<<<< Updated upstream
-      </div>
+      </div>  
+
       
 
       <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-        {/* <div style={{ width: '350px', background: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.1)', padding: '20px', overflowY: 'auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '30px' }}>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>17</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Total Projects</div>
-            </div>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>$1B+</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Total Investment</div>
-            </div>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>2</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Completed</div>
-            </div>
-            <div style={{ background: 'linear-gradient(135deg, #3498db, #2980b9)', color: 'white', padding: '15px', borderRadius: '10px', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.8em', fontWeight: 'bold', marginBottom: '5px' }}>15</div>
-              <div style={{ fontSize: '0.9em', opacity: 0.9 }}>Ongoing</div>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '30px' }}>
-            <h3 style={{ color: '#2c3e50', marginBottom: '15px', fontSize: '1.2em' }}>Project Types</h3>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#e74c3c' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Green Infrastructure</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#3498db' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Grey Infrastructure</div>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '30px' }}>
-            <h3 style={{ color: '#2c3e50', marginBottom: '15px', fontSize: '1.2em' }}>Disaster Focus</h3>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#9b59b6' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Flooding & Sea Level Rise</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#e67e22' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Multi-hazard</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '8px', background: '#f8f9fa', borderRadius: '5px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '50%', marginRight: '10px', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', backgroundColor: '#1abc9c' }}></div>
-              <div style={{ fontSize: '0.9em', color: '#2c3e50' }}>Critical Infrastructure</div>
-            </div>
-          </div>
-        </div> */}
-        
-
-=======
-      </div>  
-
-      <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-        <aside style={{
+      <aside style={{
           width: '30%',
           minWidth: '300px',
           maxWidth: '400px',
@@ -1273,15 +1383,15 @@ const App = () => {
           )}
         </aside>
 
->>>>>>> Stashed changes
+        
+        
+
+
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
           <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
           {map.current && (
             <MapboxPopup map={map.current} activeFeature={activeFeature} />
           )}
-<<<<<<< Updated upstream
-          
-=======
 
           <div style={{
             position: 'absolute',
@@ -1304,56 +1414,15 @@ const App = () => {
                 transition: 'all 0.3s ease'
               }}
             >
-              {censusVisible ? 'Show City Layer' : 'Show Census Layer'}
+              {censusVisible ? 'Hide Census Layer' : 'Show Census Layer'}
             </button>
           </div>
 
-<<<<<<< Updated upstream
-      <aside style={{
-                              width: '30%',
-                              minWidth: '300px',
-                              maxWidth: '400px',
-                              background: '#ffffff',
-                              borderLeft: '1px solid #e0e0e0',
-                              overflowY: 'auto',
-                              padding: '20px',
-                              boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
-                              flexDirection: 'row-reverse'
-                            }}>
-                              <h2 style={{ 
-                                fontSize: '1.5em', 
-                                fontWeight: '600', 
-                                color: '#1b3a4b', 
-                                marginBottom: '20px' 
-                              }}>
-                                Filler
-                              </h2>
-                              
-                              <div style={{ marginBottom: '24px' }}>
-                                <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
-                                  Filler
-                                </h3>
-                                <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
-                                  Add content
-                                </p>
-                              </div>
-
-                              <div style={{ marginBottom: '24px' }}>
-                                <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
-                                  Filler
-               </h3>
-             <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
-                 Add content
-             </p>
-           </div>
-        </aside>
+      
 
 
 
-          {/* {censusLayersReady && censusStats && censusVisible && (
-=======
           {censusLayersReady && censusStats && censusVisible && (
->>>>>>> Stashed changes
             <>
               <div style={{
                 position: 'absolute',
@@ -1383,51 +1452,80 @@ const App = () => {
                   <input
                     type="radio"
                     name="census-view"
-                    value="population"
-                    checked={activeCensusView === 'population'}
-                    onChange={() => handleCensusViewChange('population')}
+                    value="pred3pe"
+                    checked={activeCensusView === 'pred3pe'}
+                    onChange={() => handleCensusViewChange('pred3pe')}
                   />
-                  Population
+                  PRED3_PE
                 </label>
               </div>
 
-              <div style={{
-                position: 'absolute',
-                right: '20px',
-                bottom: '70px',
-                zIndex: 1000,
-                background: 'rgba(255, 255, 255, 0.95)',
-                padding: '16px',
-                borderRadius: '8px',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
-                minWidth: '220px'
-              }}>
-                <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
-                  {activeCensusView === 'risk' ? 'FEMA Risk Index' : 'Population'}
+              {activeCensusView === 'risk' && sortedRatings.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  right: '20px',
+                  bottom: '70px',
+                  zIndex: 1000,
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                  minWidth: '220px'
+                }}>
+                  <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
+                    FEMA Risk Rating
+                  </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{
+                      width: '100%',
+                      height: '20px',
+                      borderRadius: '4px',
+                      background: 'linear-gradient(to right, #4CAF50 0%, #8BC34A 25%, #FFC107 50%, #FF6F00 75%, #B71C1C 100%)',
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      marginBottom: '8px'
+                    }}></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75em', color: '#546e7a' }}>
+                      <span>Very Low</span>
+                      <span>Very High</span>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '10px' }}>
-                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[0], border: '1px solid rgba(0,0,0,0.1)' }} />
-                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
-                    Low: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.min) : formatWithCommas(legendStats?.min != null ? Math.round(legendStats.min) : legendStats?.min)}
-                  </span>
+              )}
+
+              {activeCensusView === 'pred3pe' && censusStats?.pred3PE && (
+                <div style={{
+                  position: 'absolute',
+                  right: '20px',
+                  bottom: '70px',
+                  zIndex: 1000,
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  padding: '16px',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                  minWidth: '220px'
+                }}>
+                  <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
+                    PRED3_PE (%)
+                  </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <div style={{
+                      width: '100%',
+                      height: '20px',
+                      borderRadius: '4px',
+                      background: 'linear-gradient(to right, #4CAF50 0%, #8BC34A 25%, #FFC107 50%, #FF6F00 75%, #B71C1C 100%)',
+                      border: '1px solid rgba(0,0,0,0.1)',
+                      marginBottom: '8px'
+                    }}></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75em', color: '#546e7a' }}>
+                      <span>{censusStats.pred3PE.min?.toFixed(1) || '0'}%</span>
+                      <span>{censusStats.pred3PE.max?.toFixed(1) || '0'}%</span>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', gap: '10px' }}>
-                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[1], border: '1px solid rgba(0,0,0,0.1)' }} />
-                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
-                    Mid: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.mid) : formatWithCommas(legendStats?.mid != null ? Math.round(legendStats.mid) : legendStats?.mid)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ display: 'inline-block', width: '20px', height: '15px', borderRadius: '3px', background: legendColors[2], border: '1px solid rgba(0,0,0,0.1)' }} />
-                  <span style={{ fontSize: '0.9em', color: '#1b3a4b' }}>
-                    High: {activeCensusView === 'risk' ? formatRiskValue(legendStats?.max) : formatWithCommas(legendStats?.max != null ? Math.round(legendStats.max) : legendStats?.max)}
-                  </span>
-                </div>
-              </div>
+              )}
             </>
           )}
 
->>>>>>> Stashed changes
           {loading && (
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(255, 255, 255, 0.9)', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 1000 }}>
               <div style={{ width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #3498db', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }}></div>
@@ -1435,71 +1533,11 @@ const App = () => {
             </div>
           )}
 
-<<<<<<< Updated upstream
-          <div style={{ position: 'absolute', top: '150px', right: '10px', background: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', zIndex: 1000, minWidth: '200px' }}>
-            <h4 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '1em' }}>Special Districts</h4>
-            {/* <button
-              onClick={() => zoomToDistrict('cutler-bay')}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '10px',
-                marginBottom: '8px',
-                background: currentDistrict === 'cutler-bay' ? 'linear-gradient(135deg, #27ae60, #229954)' : 'linear-gradient(135deg, #3498db, #2980b9)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontSize: '0.9em',
-                transition: 'all 0.3s'
-              }}
-            >
-              Cutler Bay
-            </button>
-            <button
-              onClick={() => zoomToDistrict('miami-beach')}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '10px',
-                marginBottom: '8px',
-                background: currentDistrict === 'miami-beach' ? 'linear-gradient(135deg, #27ae60, #229954)' : 'linear-gradient(135deg, #3498db, #2980b9)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontSize: '0.9em',
-                transition: 'all 0.3s'
-              }}
-            >
-              Miami Beach
-            </button> */}
-            <button
-              onClick={resetView}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '10px',
-                background: 'linear-gradient(135deg, #95a5a6, #7f8c8d)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontSize: '0.9em',
-                transition: 'all 0.3s'
-              }}
-            >
-              Reset View
-            </button>
-          </div>
 
           {/* Map Style Toggle */}
-          {/*
-=======
->>>>>>> Stashed changes
           <div style={{ 
             position: 'absolute', 
-            bottom: '20px', 
+            bottom: '30px', 
             right: '20px', 
             background: 'white', 
             borderRadius: '25px', 
@@ -1534,99 +1572,15 @@ const App = () => {
                 {isSatelliteView ? 'Standard' : 'Satellite'}
               </span>
             </button>
-          </div>
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-
-
- */}
 
 
 
-          
->>>>>>> Stashed changes
-        </div>
-      </div>
-  <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-        <div style={{ width: '300px', background: 'white', boxShadow: '2px 0 10px rgba(0,0,0,0.1)', padding: '20px', overflowY: 'auto' }}>
-          <h3 style={{ color: '#2c3e50', marginBottom: '15px', fontSize: '1.2em', fontWeight: 600 }}>Miami-Dade Cities</h3>
-          <div style={{ fontSize: '0.85em', color: '#7f8c8d', marginBottom: '15px' }}>
-            Select a city to zoom in
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {Object.entries(districtsRef.current)
-              .sort((a, b) => a[1].name.localeCompare(b[1].name))
-              .map(([districtId, district]) => (
-                <button
-                  key={districtId}
-                  onClick={() => zoomToDistrict(districtId)}
-                  style={{
-                    padding: '12px 15px',
-                    background: currentDistrict === districtId 
-                      ? 'linear-gradient(135deg, #27ae60, #229954)' 
-                      : 'linear-gradient(135deg, #ecf0f1, #dfe6e9)',
-                    color: currentDistrict === districtId ? 'white' : '#2c3e50',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '0.9em',
-                    fontWeight: currentDistrict === districtId ? 600 : 400,
-                    transition: 'all 0.3s',
-                    textAlign: 'left',
-                    boxShadow: currentDistrict === districtId 
-                      ? '0 2px 8px rgba(39, 174, 96, 0.3)' 
-                      : '0 1px 3px rgba(0,0,0,0.1)',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentDistrict !== districtId) {
-                      e.target.style.background = 'linear-gradient(135deg, #dfe6e9, #cfd9df)';
-                      e.target.style.transform = 'translateX(3px)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentDistrict !== districtId) {
-                      e.target.style.background = 'linear-gradient(135deg, #ecf0f1, #dfe6e9)';
-                      e.target.style.transform = 'translateX(0)';
-                    }
-                  }}
-                >
-                  {district.name}
-                </button>
-              ))}
-          </div>
-          <button
-            onClick={resetView}
-            style={{
-              width: '100%',
-              marginTop: '20px',
-              padding: '12px 15px',
-              background: 'linear-gradient(135deg, #95a5a6, #7f8c8d)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '0.9em',
-              fontWeight: 600,
-              transition: 'all 0.3s',
-              boxShadow: '0 2px 8px rgba(149, 165, 166, 0.3)',
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = 'linear-gradient(135deg, #7f8c8d, #6c7a7d)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = 'linear-gradient(135deg, #95a5a6, #7f8c8d)';
-            }}
-          >
-            Reset View
-          </button>
-        </div>
-      </div>
-=======
+
+
         </div>
       </div>
 
->>>>>>> Stashed changes
+
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
@@ -1635,8 +1589,9 @@ const App = () => {
         .mapboxgl-popup-content {
           border-radius: 10px !important;
           box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
-          padding-right: 30px;
+          padding-right: 30px; /* space for close button */
         }
+        /* Ensure popups render above markers */
         .mapboxgl-popup {
           z-index: 10000 !important;
         }
@@ -1644,9 +1599,9 @@ const App = () => {
           position: absolute;
           top: 6px;
           right: 6px;
-          transform: none;
+          transform: none; /* ensure it sits inside */
           background: #ffffff;
-          borderRadius: 4px;
+          border-radius: 4px;
           width: 22px;
           height: 22px;
           line-height: 20px;
@@ -1655,16 +1610,19 @@ const App = () => {
           box-shadow: 0 1px 2px rgba(0,0,0,0.08);
         }
       `}</style>
+       </div>
     </div>
   );
 };
 
 export default App;
 
+// React-based Mapbox Popup using a portal to render rich content
 const MapboxPopup = ({ map, activeFeature }) => {
   const popupRef = useRef(null);
   const contentRef = useRef(typeof document !== 'undefined' ? document.createElement('div') : null);
 
+  // Create popup instance on mount
   useEffect(() => {
     if (!map) return;
     popupRef.current = new mapboxgl.Popup({ closeOnClick: false, offset: 20 });
@@ -1673,6 +1631,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
     };
   }, [map]);
 
+  // Update popup when activeFeature changes
   useEffect(() => {
     if (!map || !popupRef.current) return;
     if (!activeFeature) {
@@ -1692,6 +1651,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
   if (!contentRef.current) return null;
 
   const props = activeFeature?.properties || {};
+
   return (
     <>{createPortal(
       <div className="portal-content" style={{ maxWidth: 360 }}>
@@ -1724,12 +1684,8 @@ const MapboxPopup = ({ map, activeFeature }) => {
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Cost</td>
-<<<<<<< Updated upstream
-              <td style={{ color: '#27ae60', fontWeight: 700 }}>{props['Esimated Project Cost'] || 'Not disclosed'}</td>
-=======
               <td style={{ color: (props['Estimated Project Cost'] == null) ?'#f39c12' : '#27ae60', fontWeight: 700 }}>{
-                  (props['Estimated Project Cost'] == null) ? 'Not Disclosed' : "$" + Intl.NumberFormat('en-US').format(props['Estimated Project Cost'])}</td>
->>>>>>> Stashed changes
+                  (props['Estimated Project Cost'] == null) ? 'Not Disclosed' : "$" + props['Estimated Project Cost']}</td>
             </tr>
           </tbody>
         </table>
