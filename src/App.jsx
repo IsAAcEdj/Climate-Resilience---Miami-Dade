@@ -95,7 +95,7 @@ const App = () => {
   const hoveredCensusIdRef = useRef(null);
   const censusStatsRef = useRef(null);
   const censusViewRef = useRef('risk');
-  const pred3PEDataRef = useRef({}); // Mapping of GEOID to PRED3_PE values
+  const pred3PEDataRef = useRef({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [allMarkers, setAllMarkers] = useState([]);
@@ -107,9 +107,10 @@ const App = () => {
   const [censusLayersReady, setCensusLayersReady] = useState(false);
   const [activeCensusView, setActiveCensusView] = useState('risk');
   const [censusVisible, setCensusVisible] = useState(true);
+  const [selectedElement, setSelectedElement] = useState(null);
   const censusEventsBoundRef = useRef(false);
   const censusVisibleRef = useRef(true);
-  const mapBounds = [[-81.018698, 25.077495],[-79.501861, 26.326954]];
+  const defaultBounds = [[-80.741919, 25.150035],[-79.838501, 26.1512114]];
 
   const handleCensusViewChange = (view) => {
     censusViewRef.current = view;
@@ -118,7 +119,7 @@ const App = () => {
 
   const handleCensusVisibilityToggle = () => {
     setCensusVisible((prev) => !prev);
-        if(!censusVisible){
+    if(!censusVisible){
       Object.keys(districtsRef.current).forEach(districtId => {
         map.current.setLayoutProperty(`${districtId}-fill`, 'visibility', 'none');
         map.current.setLayoutProperty(`${districtId}-outline`, 'visibility', 'none');
@@ -130,9 +131,7 @@ const App = () => {
       });
     }
   };
-  
 
-  // Get marker color based on project type
   const getMarkerColor = (projectType) => {
     switch(projectType) {
       case 'Green Infrastructure':
@@ -144,7 +143,6 @@ const App = () => {
     }
   };
 
-  // Get marker size based on project cost
   const getMarkerSize = (cost) => {
     if (!cost) return 8;
     const numericCost = parseFloat(cost.replace(/[$,]/g, ''));
@@ -153,10 +151,6 @@ const App = () => {
     return 8;
   };
 
-
-  
-
-  // Check if point is within district
   const isPointInDistrict = (point, districtCoords) => {
     const [lng, lat] = point;
     let inside = false;
@@ -173,7 +167,6 @@ const App = () => {
     return inside;
   };
 
-  // Zoom to district
   const zoomToDistrict = (districtId) => {
     const district = districtsRef.current[districtId];
     if (!district || !map.current) return;
@@ -223,11 +216,11 @@ const App = () => {
     });
   };
 
-  // Reset view
   const resetView = () => {
     if (!map.current) return;
     
     setCurrentDistrict(null);
+    setSelectedElement(null);
     handleCensusViewChange('risk');
 
     Object.keys(districtsRef.current).forEach(id => {
@@ -244,227 +237,11 @@ const App = () => {
 
     map.current.flyTo({
       center: [-80.6327, 25.5516],
-      zoom: 11,
+      zoom: 9,
       duration: 1500
     });
   };
 
-
-
-
- 
-    const riskColorExpression = buildRiskRatingColorExpression();
-    
-    // Build color expression for PRED3_PE (percentage values)
-    const buildPred3PEColorExpression = () => {
-      const pred3PEStats = stats.pred3PE;
-      if (!pred3PEStats || pred3PEStats.min === null || pred3PEStats.max === null) {
-        return [
-          'case',
-          ['==', ['typeof', ['get', '__pred3PE']], 'number'],
-          '#9e9e9e',
-          '#9e9e9e'
-        ];
-      }
-      if (pred3PEStats.min === pred3PEStats.max) {
-        return [
-          'case',
-          ['==', ['typeof', ['get', '__pred3PE']], 'number'],
-          '#4CAF50',
-          '#9e9e9e'
-        ];
-      }
-      // Color gradient from green (low) to red (high)
-      return [
-        'case',
-        ['==', ['typeof', ['get', '__pred3PE']], 'number'],
-        [
-          'interpolate',
-          ['linear'],
-          ['get', '__pred3PE'],
-          pred3PEStats.min, '#4CAF50',  // Green for low values
-          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.25, '#8BC34A',  // Lime green
-          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.5, '#FFC107',  // Amber
-          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.75, '#FF6F00',  // Red-orange
-          pred3PEStats.max, '#B71C1C'  // Dark red for high values
-        ],
-        '#9e9e9e'
-      ];
-    };
-
-    const pred3PEColorExpression = buildPred3PEColorExpression();
-    const isVisible = censusVisibleRef.current;
-    const riskVisibility = view === 'risk' && isVisible ? 'visible' : 'none';
-    const pred3PEVisibility = view === 'pred3pe' && isVisible ? 'visible' : 'none';
-    const outlineVisibility = isVisible ? 'visible' : 'none';
-
-    if (map.current.getSource('census-tracts')) {
-      map.current.getSource('census-tracts').setData(censusDataRef.current);
-    } else {
-      map.current.addSource('census-tracts', {
-        type: 'geojson',
-        data: censusDataRef.current
-      });
-    }
-
-    if (!map.current.getLayer('census-tracts-risk')) {
-      map.current.addLayer({
-        id: 'census-tracts-risk',
-        type: 'fill',
-        source: 'census-tracts',
-        layout: {
-          visibility: riskVisibility
-        },
-        paint: {
-          'fill-color': riskColorExpression,
-          'fill-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            0.7,
-            0.5
-          ]
-        }
-      });
-    } else {
-      map.current.setPaintProperty('census-tracts-risk', 'fill-color', riskColorExpression);
-      map.current.setLayoutProperty('census-tracts-risk', 'visibility', riskVisibility);
-    }
-
-    // Add PRED3_PE layer
-    if (!map.current.getLayer('census-tracts-pred3pe')) {
-      map.current.addLayer({
-        id: 'census-tracts-pred3pe',
-        type: 'fill',
-        source: 'census-tracts',
-        layout: {
-          visibility: pred3PEVisibility
-        },
-        paint: {
-          'fill-color': pred3PEColorExpression,
-          'fill-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            0.7,
-            0.5
-          ]
-        }
-      });
-    } else {
-      map.current.setPaintProperty('census-tracts-pred3pe', 'fill-color', pred3PEColorExpression);
-      map.current.setLayoutProperty('census-tracts-pred3pe', 'visibility', pred3PEVisibility);
-    }
-
-    // Removed: census-tracts-population layer - population layer disabled
-    /* if (!map.current.getLayer('census-tracts-population')) {
-      map.current.addLayer({
-        id: 'census-tracts-population',
-        type: 'fill',
-        source: 'census-tracts',
-        layout: {
-          visibility: populationVisibility
-        },
-        paint: {
-          'fill-color': populationColorExpression,
-          'fill-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            0.8,
-            0.6
-          ]
-        }
-      });
-    } else {
-      map.current.setPaintProperty('census-tracts-population', 'fill-color', populationColorExpression);
-      map.current.setLayoutProperty('census-tracts-population', 'visibility', populationVisibility);
-    } */
-
-    if (!map.current.getLayer('census-tracts-outline')) {
-      map.current.addLayer({
-        id: 'census-tracts-outline',
-        type: 'line',
-        source: 'census-tracts',
-        layout: {
-          visibility: outlineVisibility
-        },
-        paint: {
-          'line-color': '#777777',
-          'line-width': 1,
-          'line-opacity': 0.6
-        }
-      });
-    } else {
-      map.current.setLayoutProperty('census-tracts-outline', 'visibility', outlineVisibility);
-    }
-
-    if (!censusEventsBoundRef.current) {
-      const censusLayerIds = ['census-tracts-risk', 'census-tracts-pred3pe'];
-
-      const handleHover = (e) => {
-        if (!map.current) return;
-        const feature = e.features && e.features[0];
-        if (!feature || feature.id === undefined || feature.id === null) return;
-
-        if (hoveredCensusIdRef.current !== null) {
-          map.current.setFeatureState(
-            { source: 'census-tracts', id: hoveredCensusIdRef.current },
-            { hover: false }
-          );
-        }
-
-        hoveredCensusIdRef.current = feature.id;
-        map.current.setFeatureState(
-          { source: 'census-tracts', id: hoveredCensusIdRef.current },
-          { hover: true }
-        );
-      };
-
-      const handleLeave = () => {
-        if (!map.current) return;
-        if (hoveredCensusIdRef.current !== null) {
-          map.current.setFeatureState(
-            { source: 'census-tracts', id: hoveredCensusIdRef.current },
-            { hover: false }
-          );
-        }
-        hoveredCensusIdRef.current = null;
-        map.current.getCanvas().style.cursor = '';
-      };
-
-      const handleClick = (e) => {
-        if (!map.current) return;
-        const feature = e.features && e.features[0];
-        if (!feature) return;
-        const props = feature.properties || {};
-        const tractName = props['L0Census_Tracts.NAME'] || 'Census Tract';
-        const tractId = props['L0Census_Tracts.GEOID'] || feature.id || 'N/A';
-        const riskRating = props['__riskRating'] || props['T_FEMA_National_Risk_Index_$_.FEMAIndexRating'] || 'Not Rated';
-        const pred3PE = props['__pred3PE'];
-        // Removed: riskIndexRaw - only showing rating now
-
-        new mapboxgl.Popup({ closeButton: true, closeOnClick: true })
-          .setLngLat(e.lngLat)
-          .setHTML(popupHtml)
-          .addTo(map.current);
-      };
-
-      censusLayerIds.forEach((layerId) => {
-        map.current.on('click', layerId, handleClick);
-        map.current.on('mouseenter', layerId, () => {
-          if (map.current) {
-            map.current.getCanvas().style.cursor = 'pointer';
-          }
-        });
-        map.current.on('mousemove', layerId, handleHover);
-        map.current.on('mouseleave', layerId, handleLeave);
-      });
-
-      censusEventsBoundRef.current = true;
-    }
-
-    setCensusLayersReady(true);
-  }, [];
-
-  // Toggle between satellite and standard map
   const addCensusSourceAndLayers = useCallback(() => {
     if (!map.current || !censusDataRef.current) return;
 
@@ -548,7 +325,7 @@ const App = () => {
         type: 'fill',
         source: 'census-tracts',
         layout: {
-          'visibility': riskVisibility,
+          visibility: riskVisibility
         },
         paint: {
           'fill-color': riskColorExpression,
@@ -656,17 +433,19 @@ const App = () => {
           population: props['__population'],
           coordinates: e.lngLat
         });
+// commented out: census tract popup (displays redundant info + looks bad with project popups, but doesnt look bad on its own...
+// could be included later)
+      //   const tractName = props['L0Census_Tracts.NAME'] || 'Census Tract';
+      //   const tractId = props['L0Census_Tracts.GEOID'] || feature.id || 'N/A';
+      //   const riskRating = props['__riskRating'] || props['T_FEMA_National_Risk_Index_$_.FEMAIndexRating'] || 'Not Rated';
+      //   const pred3PE = props['__pred3PE'];
 
-        const tractName = props['L0Census_Tracts.NAME'] || 'Census Tract';
-        const tractId = props['L0Census_Tracts.GEOID'] || feature.id || 'N/A';
-        const riskRating = props['__riskRating'] || props['T_FEMA_National_Risk_Index_$_.FEMAIndexRating'] || 'Not Rated';
-        const pred3PE = props['__pred3PE'];
 
-
-
-        new mapboxgl.Popup({ closeButton: true, closeOnClick: true })
-          .setLngLat(e.lngLat)
-          .addTo(map.current);
+      //   new mapboxgl.Popup({ closeButton: true, closeOnClick: true })
+      //     .setLngLat(e.lngLat)
+      //     .setHTML(popupHtml)
+      //     .addTo(map.current);
+      // 
       };
 
       censusLayerIds.forEach((layerId) => {
@@ -692,63 +471,6 @@ const App = () => {
     const newStyle = isSatelliteView ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/satellite-v9';
     
     map.current.once('styledata', () => {
-      // Commented out: Re-add district polygons after style change (miami_cities.geojson)
-      /* Object.keys(districtsRef.current).forEach(districtId => {
-        const district = districtsRef.current[districtId];
-        
-        if (!map.current.getSource(districtId)) {
-          map.current.addSource(districtId, {
-            type: 'geojson',
-            data: {
-              type: 'Feature',
-              geometry: {
-                type: 'Polygon',
-                coordinates: [district.coordinates]
-              }
-            }
-          });
-        }
-
-        if (!map.current.getLayer(`${districtId}-fill`)) {
-          map.current.addLayer({
-            id: `${districtId}-fill`,
-            type: 'fill',
-            source: districtId,
-            paint: {
-              'fill-color': '#3498db',
-              'fill-opacity': 0.1
-            }
-          });
-        }
-
-        if (!map.current.getLayer(`${districtId}-outline`)) {
-          map.current.addLayer({
-            id: `${districtId}-outline`,
-            type: 'line',
-            source: districtId,
-            paint: {
-              'line-color': '#2980b9',
-              'line-width': 2,
-              'line-opacity': 0.5
-            }
-          });
-        }
-
-        // Re-add event listeners
-        map.current.on('click', `${districtId}-fill`, () => {
-          zoomToDistrict(districtId);
-        });
-
-        map.current.on('mouseenter', `${districtId}-fill`, () => {
-          map.current.getCanvas().style.cursor = 'pointer';
-        });
-
-        map.current.on('mouseleave', `${districtId}-fill`, () => {
-          map.current.getCanvas().style.cursor = '';
-        });
-      }); */
-
-      // Re-add project markers
       if (allProjectsData) {
         allMarkers.forEach(marker => {
           marker.addTo(map.current);
@@ -818,8 +540,8 @@ const App = () => {
       style: 'mapbox://styles/mapbox/light-v11',
       center: [-80.6327, 25.5516],
       zoom: 9,
-      maxBounds: mapBounds,
-      bounds: mapBounds
+      bounds: defaultBounds,
+      maxBounds: defaultBounds
     });
 
     map.current.addControl(new mapboxgl.NavigationControl());
@@ -830,11 +552,9 @@ const App = () => {
     }));
 
     map.current.on('load', async () => {
-      try {
-  Object.keys(districtsRef.current).forEach(districtId => {
-          const district = districtsRef.current[districtId];
 
-          map.current.addSource(districtId, {
+    try{
+      map.current.addSource(districtId, {
             type: 'geojson',
             data: {
               type: 'Feature',
@@ -880,9 +600,9 @@ const App = () => {
           map.current.on('mouseleave', `${districtId}-fill`, () => {
             map.current.getCanvas().style.cursor = '';
           });
-        });
+
       } catch (err) {
-        console.error('Map initialization error:', err);
+        console.error('City initialization error:', err);
         setError('Error initializing map');
         setLoading(false);
       }
@@ -939,14 +659,12 @@ const App = () => {
         setLoading(false);
       }
 
-      // Load FL_CRE.csv data
       try {
         const csvResponse = await fetch('/FL_CRE.csv');
         if (csvResponse.ok) {
           const csvText = await csvResponse.text();
           const lines = csvText.split('\n').filter(line => line.trim());
           
-          // Simple CSV parser that handles quoted fields
           const parseCSVLine = (line) => {
             const result = [];
             let current = '';
@@ -979,7 +697,6 @@ const App = () => {
               const pred3PE = parseFloat(values[pred3PEIndex]?.trim());
               
               if (geoId && !isNaN(pred3PE)) {
-                // Convert "1400000US12086000107" to "12086000107"
                 const geoid = geoId.replace('1400000US', '');
                 pred3PEMap[geoid] = pred3PE;
               }
@@ -1036,7 +753,6 @@ const App = () => {
           .map(feature => feature.properties.__pred3PE)
           .filter(value => value !== null && value !== undefined && Number.isFinite(value));
 
-        // Get unique risk ratings for stats
         const uniqueRatings = [...new Set(riskRatings)];
         const riskStats = { ratings: uniqueRatings, count: riskRatings.length };
         const populationStats = getRangeStats(populationValues);
@@ -1146,13 +862,12 @@ const App = () => {
     }
   }, [censusStats, censusLayersReady, addCensusSourceAndLayers]);
 
-  // Legend for risk ratings - More distinctive colors
   const riskRatingColors = {
-    'Very Low': '#4CAF50',           // Bright Green
-    'Relatively Low': '#8BC34A',     // Lime Green
-    'Relatively Moderate': '#FFC107', // Amber/Yellow
-    'Relatively High': '#FF6F00',    // Red-Orange
-    'Very High': '#B71C1C'           // Dark Red
+    'Very Low': '#4CAF50',
+    'Relatively Low': '#8BC34A',
+    'Relatively Moderate': '#FFC107',
+    'Relatively High': '#FF6F00',
+    'Very High': '#B71C1C'
   };
   
   const legendRatings = censusStats?.risk?.ratings || [];
@@ -1210,10 +925,8 @@ const App = () => {
         </div>
       </div>  
 
-      
-
       <div style={{ display: 'flex', height: 'calc(100vh - 80px)', minHeight: 'calc(100vh - 80px)' }}>
-      <aside style={{
+        <aside style={{
           width: '30%',
           minWidth: '300px',
           maxWidth: '400px',
@@ -1248,7 +961,7 @@ const App = () => {
                   Layer Controls
                 </h3>
                 <p style={{ color: '#546e7a', fontSize: '0.95em', lineHeight: '1.6' }}>
-                  Toggle between FEMA Risk Index and PRED3_PE views. Use the visibility controls to toggle between city view and census tract view.
+                  Toggle between FEMA Risk Index and PRED3_PE views. Use the visibility controls to toggle between city and census tract view.
                 </p>
               </div>
             </>
@@ -1383,10 +1096,6 @@ const App = () => {
           )}
         </aside>
 
-        
-        
-
-
         <div style={{ flex: 1, position: 'relative', height: '100%' }}>
           <div ref={mapContainer} style={{ width: '100%', height: '100%', minHeight: 'calc(100vh - 80px)' }} />
           {map.current && (
@@ -1414,13 +1123,9 @@ const App = () => {
                 transition: 'all 0.3s ease'
               }}
             >
-              {censusVisible ? 'Hide Census Layer' : 'Show Census Layer'}
+              {censusVisible ? 'Show City Layer' : 'Show Census Layer'}
             </button>
           </div>
-
-      
-
-
 
           {censusLayersReady && censusStats && censusVisible && (
             <>
@@ -1533,8 +1238,6 @@ const App = () => {
             </div>
           )}
 
-
-          {/* Map Style Toggle */}
           <div style={{ 
             position: 'absolute', 
             bottom: '30px', 
@@ -1572,14 +1275,9 @@ const App = () => {
                 {isSatelliteView ? 'Standard' : 'Satellite'}
               </span>
             </button>
-
-
-
-
-
+          </div>
         </div>
       </div>
-
 
       <style>{`
         @keyframes spin {
@@ -1589,9 +1287,8 @@ const App = () => {
         .mapboxgl-popup-content {
           border-radius: 10px !important;
           box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
-          padding-right: 30px; /* space for close button */
+          padding-right: 30px;
         }
-        /* Ensure popups render above markers */
         .mapboxgl-popup {
           z-index: 10000 !important;
         }
@@ -1599,9 +1296,9 @@ const App = () => {
           position: absolute;
           top: 6px;
           right: 6px;
-          transform: none; /* ensure it sits inside */
+          transform: none;
           background: #ffffff;
-          border-radius: 4px;
+          borderRadius: 4px;
           width: 22px;
           height: 22px;
           line-height: 20px;
@@ -1610,19 +1307,16 @@ const App = () => {
           box-shadow: 0 1px 2px rgba(0,0,0,0.08);
         }
       `}</style>
-       </div>
     </div>
   );
 };
 
 export default App;
 
-// React-based Mapbox Popup using a portal to render rich content
 const MapboxPopup = ({ map, activeFeature }) => {
   const popupRef = useRef(null);
   const contentRef = useRef(typeof document !== 'undefined' ? document.createElement('div') : null);
 
-  // Create popup instance on mount
   useEffect(() => {
     if (!map) return;
     popupRef.current = new mapboxgl.Popup({ closeOnClick: false, offset: 20 });
@@ -1631,7 +1325,6 @@ const MapboxPopup = ({ map, activeFeature }) => {
     };
   }, [map]);
 
-  // Update popup when activeFeature changes
   useEffect(() => {
     if (!map || !popupRef.current) return;
     if (!activeFeature) {
@@ -1685,7 +1378,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Cost</td>
               <td style={{ color: (props['Estimated Project Cost'] == null) ?'#f39c12' : '#27ae60', fontWeight: 700 }}>{
-                  (props['Estimated Project Cost'] == null) ? 'Not Disclosed' : "$" + props['Estimated Project Cost']}</td>
+                  (props['Estimated Project Cost'] == null) ? 'Not Disclosed' : "$" + formatWithCommas(props['Estimated Project Cost'])}</td>
             </tr>
           </tbody>
         </table>
