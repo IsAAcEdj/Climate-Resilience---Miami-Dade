@@ -135,6 +135,40 @@ const App = () => {
   const [selectedTypes, setSelectedTypes] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedDisasterFocus, setSelectedDisasterFocus] = useState([]);
+  const [selectedCity, setSelectedCity] = useState('');
+  const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  // Listen for popup close events to reset activeFeature state
+  useEffect(() => {
+    const handlePopupClosed = () => {
+      setActiveFeature(null);
+    };
+
+    window.addEventListener('popupClosed', handlePopupClosed);
+
+    return () => {
+      window.removeEventListener('popupClosed', handlePopupClosed);
+    };
+  }, []);
+
+  // Close city dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const cityDropdown = document.querySelector('[data-city-dropdown]');
+      if (cityDropdownOpen && cityDropdown && !cityDropdown.contains(event.target)) {
+        setCityDropdownOpen(false);
+      }
+    };
+
+    if (cityDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [cityDropdownOpen]);
 
   const handleCensusViewChange = (view) => {
     censusViewRef.current = view;
@@ -316,23 +350,22 @@ const App = () => {
         return [
           'case',
           ['==', ['typeof', ['get', '__pred3PE']], 'number'],
-          '#4CAF50',
+          '#49006A',
           '#9e9e9e'
         ];
       }
-      // Color gradient from green (low) to red (high)
+      // Monochrome color scale with 4 discrete blocks from white (low) to dark purple (high)
+      const range = pred3PEStats.max - pred3PEStats.min;
       return [
         'case',
         ['==', ['typeof', ['get', '__pred3PE']], 'number'],
         [
-          'interpolate',
-          ['linear'],
+          'step',
           ['get', '__pred3PE'],
-          pred3PEStats.min, '#4CAF50',  // Green for low values
-          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.25, '#8BC34A',  // Lime green
-          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.5, '#FFC107',  // Amber
-          pred3PEStats.min + (pred3PEStats.max - pred3PEStats.min) * 0.75, '#FF6F00',  // Red-orange
-          pred3PEStats.max, '#B71C1C'  // Dark red for high values
+          '#FFFFFF',  // Block 1: White for 0-25% range
+          pred3PEStats.min + range * 0.25, '#D4B3E8',  // Block 2: Light purple for 25-50% range
+          pred3PEStats.min + range * 0.5, '#A866C7',  // Block 3: Medium purple for 50-75% range
+          pred3PEStats.min + range * 0.75, '#49006A'   // Block 4: Very dark purple (rgb(73,0,106)) for 75-100% range
         ],
         '#9e9e9e'
       ];
@@ -390,8 +423,8 @@ const App = () => {
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
-            0.7,
-            0.5
+            0.8,
+            0.6
           ]
         }
       });
@@ -531,7 +564,7 @@ const App = () => {
         // Removed: riskIndexRaw - only showing rating now
 
         const popupHtml = `
-          <div style="font-family: 'Inter', 'Segoe UI', sans-serif; min-width: 220px;">
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; min-width: 220px;">
             <div style="font-size: 1.05em; font-weight: 700; color: #1b3a4b; margin-bottom: 4px;">${tractName}</div>
             <div style="font-size: 0.85em; color: #546e7a; margin-bottom: 10px;">Tract ID: ${tractId}</div>
             <hr style="border: none; border-top: 1px solid #e0e6ed; margin: 8px 0;" />
@@ -1106,6 +1139,7 @@ const App = () => {
   const uniqueTypes = getUniqueValues('Type');
   const uniqueCategories = getUniqueValues('Categories');
   const uniqueDisasterFocus = getUniqueValues('Disaster Focus');
+  const uniqueCities = getUniqueValues('City');
 
   // Filter markers based on selected filters
   useEffect(() => {
@@ -1117,12 +1151,14 @@ const App = () => {
       const type = props['Type'];
       const category = props['Categories'];
       const disasterFocus = props['Disaster Focus'];
+      const city = props['City'];
 
       const typeMatch = selectedTypes.length === 0 || selectedTypes.includes(type);
       const categoryMatch = selectedCategories.length === 0 || selectedCategories.includes(category);
       const disasterMatch = selectedDisasterFocus.length === 0 || selectedDisasterFocus.includes(disasterFocus);
+      const cityMatch = !selectedCity || selectedCity === '' || city === selectedCity;
 
-      const shouldShow = typeMatch && categoryMatch && disasterMatch;
+      const shouldShow = typeMatch && categoryMatch && disasterMatch && cityMatch;
 
       if (shouldShow) {
         marker.getElement().style.display = 'block';
@@ -1130,7 +1166,7 @@ const App = () => {
         marker.getElement().style.display = 'none';
       }
     });
-  }, [selectedTypes, selectedCategories, selectedDisasterFocus, allMarkers]);
+  }, [selectedTypes, selectedCategories, selectedDisasterFocus, selectedCity, allMarkers]);
 
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', width: '100%', overflow: 'hidden', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
@@ -1144,21 +1180,105 @@ const App = () => {
         boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
         flexShrink: 0
       }}>
-        <div>
-          <h1 style={{ 
-            fontSize: '2em', 
-            margin: '0', 
-            fontWeight: 300,
-            fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-            letterSpacing: '0.5px'
-          }}>SCALE-R Dashboard</h1>
+        <div style={{ position: 'relative' }}>
+          <h1 
+            style={{ 
+              fontSize: '2em', 
+              margin: '0', 
+              fontWeight: 300,
+              fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+              letterSpacing: '0.5px',
+              cursor: 'pointer',
+              transition: 'color 0.2s ease',
+              color: showTooltip ? '#60a5fa' : 'white'
+            }}
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+          >
+            SCALE-R Dashboard
+          </h1>
           <p style={{ 
             fontSize: '0.9em', 
             margin: '3px 0 0 0', 
             opacity: 0.8,
-            fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+            fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
             fontWeight: 300
           }}>Miami-Dade Climate Resilience Projects</p>
+          
+          {/* Rich Info Card Tooltip */}
+          <div style={{
+            position: 'absolute',
+            left: 0,
+            top: '100%',
+            marginTop: '8px',
+            width: '384px',
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            border: '1px solid #f3f4f6',
+            overflow: 'hidden',
+            transition: 'all 0.2s ease',
+            opacity: showTooltip ? 1 : 0,
+            transform: showTooltip ? 'translateY(0)' : 'translateY(-8px)',
+            pointerEvents: showTooltip ? 'auto' : 'none',
+            zIndex: 1000
+          }}>
+            <div style={{ padding: '20px' }}>
+              <p style={{ 
+                fontSize: '0.875rem', 
+                color: '#4b5563', 
+                lineHeight: '1.75', 
+                marginBottom: '16px',
+                margin: '0 0 16px 0'
+              }}>
+                A comprehensive dashboard for visualizing climate resilience projects across Miami-Dade County, featuring interactive maps, project filtering, and community risk assessments.
+              </p>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(3, 1fr)', 
+                gap: '12px', 
+                paddingTop: '12px',
+                borderTop: '1px solid #f3f4f6'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                  <div>
+                    <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0 0 2px 0' }}>Location</p>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#374151', margin: 0 }}>Miami-Dade</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  </svg>
+                  <div>
+                    <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0 0 2px 0' }}>Projects</p>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#374151', margin: 0 }}>
+                      {allProjectsData?.features?.length || 'Loading...'}
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                  <div>
+                    <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0 0 2px 0' }}>Updated</p>
+                    <p style={{ fontSize: '0.75rem', fontWeight: 500, color: '#374151', margin: 0 }}>2025</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div style={{ 
           display: 'flex', 
@@ -1188,23 +1308,96 @@ const App = () => {
 
       <div style={{ display: 'flex', flex: 1, width: '100%', overflow: 'hidden', boxSizing: 'border-box', minHeight: 0 }}>
 <aside style={{
-          width: '30%',
-          minWidth: '300px',
-          maxWidth: '400px',
+          width: '24%',
+          minWidth: '240px',
+          maxWidth: '320px',
           background: '#ffffff',
           borderRight: '1px solid #e0e0e0',
           overflowY: 'auto',
           padding: '20px',
           boxShadow: '2px 0 8px rgba(0,0,0,0.1)'
         }}>
-          <h2 style={{ 
-            fontSize: '1.5em', 
-            fontWeight: '600', 
-            color: '#1b3a4b', 
-            marginBottom: '20px' 
-          }}>
-            Filter Projects
-          </h2>
+          {/* City Filter */}
+          <div style={{ marginBottom: '24px', position: 'relative' }} data-city-dropdown>
+            <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
+              City
+            </h3>
+            <div
+              onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                fontSize: '0.9em',
+                color: selectedCity ? '#2c3e50' : '#999',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                backgroundColor: '#ffffff',
+                cursor: 'pointer',
+                outline: 'none',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span>{selectedCity || 'All Cities'}</span>
+              <span style={{ fontSize: '0.7em' }}>▼</span>
+            </div>
+            {cityDropdownOpen && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                maxHeight: '150px',
+                height: '150px',
+                overflowY: 'auto',
+                backgroundColor: '#ffffff',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                marginTop: '4px',
+                zIndex: 1000,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}>
+                <div
+                  onClick={() => {
+                    setSelectedCity('');
+                    setCityDropdownOpen(false);
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    cursor: 'pointer',
+                    fontSize: '0.9em',
+                    color: selectedCity === '' ? '#3498db' : '#2c3e50',
+                    backgroundColor: selectedCity === '' ? '#f0f8ff' : 'transparent'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedCity === '' ? '#f0f8ff' : 'transparent'}
+                >
+                  All Cities
+                </div>
+                {uniqueCities.map(city => (
+                  <div
+                    key={city}
+                    onClick={() => {
+                      setSelectedCity(city);
+                      setCityDropdownOpen(false);
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      fontSize: '0.9em',
+                      color: selectedCity === city ? '#3498db' : '#2c3e50',
+                      backgroundColor: selectedCity === city ? '#f0f8ff' : 'transparent'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedCity === city ? '#f0f8ff' : 'transparent'}
+                  >
+                    {city}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           
           {/* Type Filter */}
           <div style={{ marginBottom: '24px' }}>
@@ -1340,8 +1533,8 @@ const App = () => {
         
 
 
-        <div style={{ flex: 1, position: 'relative', height: '100%', width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
-          <div ref={mapContainer} style={{ width: '100%', height: '100%', overflow: 'hidden', boxSizing: 'border-box' }} />
+        <div style={{ flex: 1, position: 'relative', height: '100%', width: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
+          <div ref={mapContainer} style={{ width: '100%', height: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }} />
           {map.current && (
             <MapboxPopup map={map.current} activeFeature={activeFeature} />
           )}
@@ -1462,13 +1655,19 @@ const App = () => {
                   </div>
                   <div style={{ marginBottom: '8px' }}>
                     <div style={{
+                      display: 'flex',
                       width: '100%',
                       height: '20px',
                       borderRadius: '4px',
-                      background: 'linear-gradient(to right, #4CAF50 0%, #8BC34A 25%, #FFC107 50%, #FF6F00 75%, #B71C1C 100%)',
+                      overflow: 'hidden',
                       border: '1px solid rgba(0,0,0,0.1)',
                       marginBottom: '8px'
-                    }}></div>
+                    }}>
+                      <div style={{ flex: 1, backgroundColor: '#FFFFFF', borderRight: '1px solid rgba(0,0,0,0.1)' }}></div>
+                      <div style={{ flex: 1, backgroundColor: '#D4B3E8', borderRight: '1px solid rgba(0,0,0,0.1)' }}></div>
+                      <div style={{ flex: 1, backgroundColor: '#A866C7', borderRight: '1px solid rgba(0,0,0,0.1)' }}></div>
+                      <div style={{ flex: 1, backgroundColor: '#49006A' }}></div>
+                    </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75em', color: '#546e7a' }}>
                       <span>{censusStats.pred3PE.min?.toFixed(1) || '0'}%</span>
                       <span>{censusStats.pred3PE.max?.toFixed(1) || '0'}%</span>
@@ -1579,8 +1778,20 @@ const MapboxPopup = ({ map, activeFeature }) => {
   useEffect(() => {
     if (!map) return;
     popupRef.current = new mapboxgl.Popup({ closeOnClick: false, offset: 20 });
+    
+    // Add event listener for popup close event
+    const handlePopupClose = () => {
+      // Dispatch custom event to notify App component that popup was closed
+      window.dispatchEvent(new CustomEvent('popupClosed'));
+    };
+    
+    popupRef.current.on('close', handlePopupClose);
+    
     return () => {
-      if (popupRef.current) popupRef.current.remove();
+      if (popupRef.current) {
+        popupRef.current.off('close', handlePopupClose);
+        popupRef.current.remove();
+      }
     };
   }, [map]);
 
