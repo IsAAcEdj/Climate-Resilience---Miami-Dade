@@ -354,18 +354,23 @@ const App = () => {
           '#9e9e9e'
         ];
       }
-      // Monochrome color scale with 4 discrete blocks from white (low) to dark purple (high)
+      // Continuous color scale from light purple (low) to dark purple (high)
+      // Multiple color stops for better differentiation
       const range = pred3PEStats.max - pred3PEStats.min;
       return [
         'case',
         ['==', ['typeof', ['get', '__pred3PE']], 'number'],
         [
-          'step',
+          'interpolate',
+          ['linear'],
           ['get', '__pred3PE'],
-          '#FFFFFF',  // Block 1: White for 0-25% range
-          pred3PEStats.min + range * 0.25, '#D4B3E8',  // Block 2: Light purple for 25-50% range
-          pred3PEStats.min + range * 0.5, '#A866C7',  // Block 3: Medium purple for 50-75% range
-          pred3PEStats.min + range * 0.75, '#49006A'   // Block 4: Very dark purple (rgb(73,0,106)) for 75-100% range
+          pred3PEStats.min, '#E8D4F5',        // Very light purple for minimum values
+          pred3PEStats.min + range * 0.1667, '#D4B3E8',  // Light purple
+          pred3PEStats.min + range * 0.3333, '#C298DB',  // Medium-light purple
+          pred3PEStats.min + range * 0.5, '#A866C7',     // Medium purple
+          pred3PEStats.min + range * 0.6667, '#7A3FA8',  // Medium-dark purple (darkened)
+          pred3PEStats.min + range * 0.8333, '#5A1D85',  // Dark purple (darkened)
+          pred3PEStats.max, '#2D0045'                     // Very dark purple for maximum values (darkened)
         ],
         '#9e9e9e'
       ];
@@ -854,7 +859,7 @@ const App = () => {
 
           const marker = new mapboxgl.Marker({
             color: getMarkerColor(properties['Type']),
-            scale: 1.0
+            scale: 0.7
           })
             .setLngLat(coordinates);
 
@@ -1141,6 +1146,35 @@ const App = () => {
   const uniqueDisasterFocus = getUniqueValues('Disaster Focus');
   const uniqueCities = getUniqueValues('City');
 
+  // Zoom to city markers when city is selected
+  const zoomToCity = (cityName) => {
+    if (!map.current || !allMarkers.length || !cityName || cityName === '') return;
+
+    // Filter markers for the selected city
+    const cityMarkers = allMarkers.filter(marker => {
+      if (!marker.feature) return false;
+      const props = marker.feature.properties || {};
+      return props['City'] === cityName;
+    });
+
+    if (cityMarkers.length === 0) return;
+
+    // Calculate bounding box from marker positions
+    const bounds = new mapboxgl.LngLatBounds();
+    cityMarkers.forEach(marker => {
+      const coords = marker.getLngLat();
+      bounds.extend([coords.lng, coords.lat]);
+    });
+
+    if (!bounds.isEmpty()) {
+      map.current.fitBounds(bounds, { 
+        padding: { top: 150, bottom: 150, left: 150, right: 150 },
+        maxZoom: 12,
+        duration: 1500 
+      });
+    }
+  };
+
   // Filter markers based on selected filters
   useEffect(() => {
     if (!allMarkers.length || !map.current) return;
@@ -1167,6 +1201,17 @@ const App = () => {
       }
     });
   }, [selectedTypes, selectedCategories, selectedDisasterFocus, selectedCity, allMarkers]);
+
+  // Zoom to city when selected
+  useEffect(() => {
+    if (selectedCity && selectedCity !== '' && map.current && allMarkers.length) {
+      // Use setTimeout to ensure markers are filtered/displayed first
+      const timeoutId = setTimeout(() => {
+        zoomToCity(selectedCity);
+      }, 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [selectedCity]);
 
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', width: '100%', overflow: 'hidden', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
@@ -1655,19 +1700,13 @@ const App = () => {
                   </div>
                   <div style={{ marginBottom: '8px' }}>
                     <div style={{
-                      display: 'flex',
                       width: '100%',
                       height: '20px',
                       borderRadius: '4px',
-                      overflow: 'hidden',
+                      background: 'linear-gradient(to right, #E8D4F5 0%, #D4B3E8 16.67%, #C298DB 33.33%, #A866C7 50%, #7A3FA8 66.67%, #5A1D85 83.33%, #2D0045 100%)',
                       border: '1px solid rgba(0,0,0,0.1)',
                       marginBottom: '8px'
-                    }}>
-                      <div style={{ flex: 1, backgroundColor: '#FFFFFF', borderRight: '1px solid rgba(0,0,0,0.1)' }}></div>
-                      <div style={{ flex: 1, backgroundColor: '#D4B3E8', borderRight: '1px solid rgba(0,0,0,0.1)' }}></div>
-                      <div style={{ flex: 1, backgroundColor: '#A866C7', borderRight: '1px solid rgba(0,0,0,0.1)' }}></div>
-                      <div style={{ flex: 1, backgroundColor: '#49006A' }}></div>
-                    </div>
+                    }}></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75em', color: '#546e7a' }}>
                       <span>{censusStats.pred3PE.min?.toFixed(1) || '0'}%</span>
                       <span>{censusStats.pred3PE.max?.toFixed(1) || '0'}%</span>
