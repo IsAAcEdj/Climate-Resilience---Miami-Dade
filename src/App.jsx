@@ -1198,9 +1198,21 @@ const App = () => {
         marker.getElement().style.display = 'block';
       } else {
         marker.getElement().style.display = 'none';
+        // Close popup if the hidden marker's feature is currently active
+        if (activeFeature && marker.feature) {
+          // Check if it's the same feature (same object reference or same coordinates)
+          const isSameFeature = activeFeature === marker.feature ||
+            (activeFeature.geometry?.coordinates && marker.feature.geometry?.coordinates &&
+             activeFeature.geometry.coordinates[0] === marker.feature.geometry.coordinates[0] &&
+             activeFeature.geometry.coordinates[1] === marker.feature.geometry.coordinates[1]);
+          
+          if (isSameFeature) {
+            setActiveFeature(null);
+          }
+        }
       }
     });
-  }, [selectedTypes, selectedCategories, selectedDisasterFocus, selectedCity, allMarkers]);
+  }, [selectedTypes, selectedCategories, selectedDisasterFocus, selectedCity, allMarkers, activeFeature]);
 
   // Zoom to city when selected
   useEffect(() => {
