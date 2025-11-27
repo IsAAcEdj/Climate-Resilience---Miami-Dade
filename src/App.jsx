@@ -186,11 +186,16 @@ const App = () => {
   const getMarkerColor = (projectType) => {
     switch(projectType) {
       case 'Blue Infrastructure':
+      case 'Blue':
         return '#3498db';
       case 'Green Infrastructure':
+      case 'Green':
         return '#27ae60';
       case 'Grey Infrastructure':
+      case 'Grey':
         return '#95a5a6';
+      case 'Hybrid':
+        return '#9b59b6'; // Purple for hybrid infrastructure
       default:
         return '#95a5a6';
     }
@@ -808,7 +813,7 @@ const App = () => {
       }
 
       try {
-        const response = await fetch('/Resilience_Projects_Inventory_updated_11.26.25.geojson');
+        const response = await fetch('/proj_final.geojson');
 
         if (!response.ok) {
           throw new Error(`Failed to load project data: ${response.status}`);
@@ -856,9 +861,14 @@ const App = () => {
         data.features.forEach(feature => {
           const coordinates = feature.geometry.coordinates;
           const properties = feature.properties;
+          
+          // Normalize city property by trimming whitespace
+          if (properties['City']) {
+            properties['City'] = properties['City'].trim();
+          }
 
           const marker = new mapboxgl.Marker({
-            color: getMarkerColor(properties['Type']),
+            color: getMarkerColor(properties['Infrastructure Type'] || properties['Type']),
             scale: 0.7
           })
             .setLngLat(coordinates);
@@ -1134,34 +1144,50 @@ const App = () => {
   const getUniqueValues = (field) => {
     if (!allProjectsData?.features) return [];
     const values = allProjectsData.features
-      .map(f => f.properties?.[field])
+      .map(f => {
+        const value = f.properties?.[field];
+        // Trim whitespace for City field
+        return (field === 'City' && value) ? value.trim() : value;
+      })
       .filter(v => v && v !== null && v !== undefined && v !== 'Null')
       .filter((v, i, arr) => arr.indexOf(v) === i)
       .sort();
     return values;
   };
 
-  const uniqueTypes = getUniqueValues('Type');
+  // Get unique types - prefer 'Infrastructure Type', fallback to 'Type'
+  const infrastructureTypes = getUniqueValues('Infrastructure Type');
+  const legacyTypes = getUniqueValues('Type');
+  const uniqueTypes = infrastructureTypes.length > 0 ? infrastructureTypes : legacyTypes;
   const uniqueCategories = getUniqueValues('Categories');
   const uniqueDisasterFocus = getUniqueValues('Disaster Focus');
   const uniqueCities = getUniqueValues('City');
 
   // Zoom to city markers when city is selected
   const zoomToCity = (cityName) => {
-    if (!map.current || !allMarkers.length || !cityName || cityName === '') return;
+    if (!map.current || !allMarkers.length) return;
 
-    // Filter markers for the selected city
-    const cityMarkers = allMarkers.filter(marker => {
-      if (!marker.feature) return false;
-      const props = marker.feature.properties || {};
-      return props['City'] === cityName;
-    });
+    // If no city selected (All Cities), zoom to all markers (respecting other filters)
+    // Filter markers for the selected city, or use all markers if "All Cities"
+    const markersToZoom = (!cityName || cityName === '') 
+      ? allMarkers.filter(marker => {
+          // Include all markers that are currently visible (respecting Type/Disaster Focus filters)
+          return marker.getElement().style.display !== 'none';
+        })
+      : // Filter markers for the selected city
+        allMarkers.filter(marker => {
+          if (!marker.feature) return false;
+          const props = marker.feature.properties || {};
+          const markerCity = props['City'] ? props['City'].trim() : props['City'];
+          const selectedCityTrimmed = cityName ? cityName.trim() : cityName;
+          return markerCity === selectedCityTrimmed;
+        });
 
-    if (cityMarkers.length === 0) return;
+    if (markersToZoom.length === 0) return;
 
     // Calculate bounding box from marker positions
     const bounds = new mapboxgl.LngLatBounds();
-    cityMarkers.forEach(marker => {
+    markersToZoom.forEach(marker => {
       const coords = marker.getLngLat();
       bounds.extend([coords.lng, coords.lat]);
     });
@@ -1182,17 +1208,17 @@ const App = () => {
     allMarkers.forEach(marker => {
       if (!marker.feature) return;
       const props = marker.feature.properties || {};
-      const type = props['Type'];
+      const type = props['Infrastructure Type'] || props['Type'];
       const category = props['Categories'];
       const disasterFocus = props['Disaster Focus'];
-      const city = props['City'];
+      const city = props['City'] ? props['City'].trim() : props['City'];
 
       const typeMatch = selectedTypes.length === 0 || selectedTypes.includes(type);
-      const categoryMatch = selectedCategories.length === 0 || selectedCategories.includes(category);
       const disasterMatch = selectedDisasterFocus.length === 0 || selectedDisasterFocus.includes(disasterFocus);
-      const cityMatch = !selectedCity || selectedCity === '' || city === selectedCity;
+      const selectedCityTrimmed = selectedCity ? selectedCity.trim() : selectedCity;
+      const cityMatch = !selectedCityTrimmed || selectedCityTrimmed === '' || city === selectedCityTrimmed;
 
-      const shouldShow = typeMatch && categoryMatch && disasterMatch && cityMatch;
+      const shouldShow = typeMatch && disasterMatch && cityMatch;
 
       if (shouldShow) {
         marker.getElement().style.display = 'block';
@@ -1212,11 +1238,11 @@ const App = () => {
         }
       }
     });
-  }, [selectedTypes, selectedCategories, selectedDisasterFocus, selectedCity, allMarkers, activeFeature]);
+  }, [selectedTypes, selectedDisasterFocus, selectedCity, allMarkers, activeFeature]);
 
-  // Zoom to city when selected
+  // Zoom to city when selected (including "All Cities")
   useEffect(() => {
-    if (selectedCity && selectedCity !== '' && map.current && allMarkers.length) {
+    if (map.current && allMarkers.length && selectedCity !== undefined) {
       // Use setTimeout to ensure markers are filtered/displayed first
       const timeoutId = setTimeout(() => {
         zoomToCity(selectedCity);
@@ -1497,49 +1523,6 @@ const App = () => {
             {selectedTypes.length > 0 && (
               <button
                 onClick={() => setSelectedTypes([])}
-                style={{
-                  marginTop: '8px',
-                  padding: '4px 8px',
-                  fontSize: '0.85em',
-                  background: 'transparent',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  color: '#546e7a'
-                }}
-              >
-                Clear
-              </button>
-            )}
-          </div>
-
-          {/* Categories Filter */}
-          <div style={{ marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
-              Categories
-            </h3>
-            <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-              {uniqueCategories.map(category => (
-                <label key={category} style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedCategories.includes(category)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedCategories([...selectedCategories, category]);
-                      } else {
-                        setSelectedCategories(selectedCategories.filter(c => c !== category));
-                      }
-                    }}
-                    style={{ marginRight: '8px', cursor: 'pointer' }}
-                  />
-                  <span style={{ color: '#546e7a', fontSize: '0.9em' }}>{category}</span>
-                </label>
-              ))}
-            </div>
-            {selectedCategories.length > 0 && (
-              <button
-                onClick={() => setSelectedCategories([])}
                 style={{
                   marginTop: '8px',
                   padding: '4px 8px',
@@ -1913,7 +1896,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
           <tbody>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600, width: 110 }}>Type</td>
-              <td style={{ color: '#2c3e50' }}>{props['Type'] || '—'}</td>
+              <td style={{ color: '#2c3e50' }}>{props['Infrastructure Type'] || props['Type'] || '—'}</td>
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Category</td>
@@ -1925,7 +1908,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>City</td>
-              <td style={{ color: '#2c3e50' }}>{props['City'] || '—'}</td>
+              <td style={{ color: '#2c3e50' }}>{props['City'] ? props['City'].trim() : (props['City'] || '—')}</td>
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Status</td>
