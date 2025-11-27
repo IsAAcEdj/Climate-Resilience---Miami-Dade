@@ -808,7 +808,7 @@ const App = () => {
       }
 
       try {
-        const response = await fetch('/Updated_Data_Resilience_Projects_11.25.geojson');
+        const response = await fetch('/Resilience_Projects_Inventory_updated_11.26.25.geojson');
 
         if (!response.ok) {
           throw new Error(`Failed to load project data: ${response.status}`);
@@ -1257,10 +1257,12 @@ const App = () => {
             top: '100%',
             marginTop: '8px',
             width: '384px',
-            backgroundColor: '#ffffff',
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
             borderRadius: '12px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            border: '1px solid #f3f4f6',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
             overflow: 'hidden',
             transition: 'all 0.2s ease',
             opacity: showTooltip ? 1 : 0,
@@ -1356,11 +1358,13 @@ const App = () => {
           width: '24%',
           minWidth: '240px',
           maxWidth: '320px',
-          background: '#ffffff',
-          borderRight: '1px solid #e0e0e0',
+          background: 'rgba(255, 255, 255, 0.75)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          borderRight: '1px solid rgba(255, 255, 255, 0.3)',
           overflowY: 'auto',
           padding: '20px',
-          boxShadow: '2px 0 8px rgba(0,0,0,0.1)'
+          boxShadow: '2px 0 20px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.5)'
         }}>
           {/* City Filter */}
           <div style={{ marginBottom: '24px', position: 'relative' }} data-city-dropdown>
@@ -1374,14 +1378,18 @@ const App = () => {
                 padding: '8px 12px',
                 fontSize: '0.9em',
                 color: selectedCity ? '#2c3e50' : '#999',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                backgroundColor: '#ffffff',
+                border: '1px solid rgba(255, 255, 255, 0.4)',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(255, 255, 255, 0.6)',
+                backdropFilter: 'blur(10px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(10px) saturate(180%)',
                 cursor: 'pointer',
                 outline: 'none',
                 display: 'flex',
                 justifyContent: 'space-between',
-                alignItems: 'center'
+                alignItems: 'center',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.5)',
+                transition: 'all 0.2s ease'
               }}
             >
               <span>{selectedCity || 'All Cities'}</span>
@@ -1396,12 +1404,14 @@ const App = () => {
                 maxHeight: '150px',
                 height: '150px',
                 overflowY: 'auto',
-                backgroundColor: '#ffffff',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
+                backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                border: '1px solid rgba(255, 255, 255, 0.4)',
+                borderRadius: '8px',
                 marginTop: '4px',
                 zIndex: 1000,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.5)'
               }}>
                 <div
                   onClick={() => {
@@ -1413,10 +1423,12 @@ const App = () => {
                     cursor: 'pointer',
                     fontSize: '0.9em',
                     color: selectedCity === '' ? '#3498db' : '#2c3e50',
-                    backgroundColor: selectedCity === '' ? '#f0f8ff' : 'transparent'
+                    backgroundColor: selectedCity === '' ? 'rgba(240, 248, 255, 0.7)' : 'transparent',
+                    borderRadius: '6px',
+                    transition: 'all 0.2s ease'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedCity === '' ? '#f0f8ff' : 'transparent'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(240, 248, 255, 0.5)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedCity === '' ? 'rgba(240, 248, 255, 0.7)' : 'transparent'}
                 >
                   All Cities
                 </div>
@@ -1432,10 +1444,12 @@ const App = () => {
                       cursor: 'pointer',
                       fontSize: '0.9em',
                       color: selectedCity === city ? '#3498db' : '#2c3e50',
-                      backgroundColor: selectedCity === city ? '#f0f8ff' : 'transparent'
+                      backgroundColor: selectedCity === city ? 'rgba(240, 248, 255, 0.7)' : 'transparent',
+                      borderRadius: '6px',
+                      transition: 'all 0.2s ease'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedCity === city ? '#f0f8ff' : 'transparent'}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(240, 248, 255, 0.5)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedCity === city ? 'rgba(240, 248, 255, 0.7)' : 'transparent'}
                   >
                     {city}
                   </div>
@@ -1595,13 +1609,17 @@ const App = () => {
               disabled={!censusLayersReady}
               style={{
                 padding: '10px 16px',
-                background: censusVisible ? 'linear-gradient(135deg, #0b8457, #06623b)' : 'linear-gradient(135deg, #546e7a, #2f4858)',
+                background: censusVisible 
+                  ? 'linear-gradient(135deg, rgba(11, 132, 87, 0.85), rgba(6, 98, 59, 0.85))' 
+                  : 'linear-gradient(135deg, rgba(84, 110, 122, 0.85), rgba(47, 72, 88, 0.85))',
+                backdropFilter: 'blur(10px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(10px) saturate(180%)',
                 color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '8px',
                 cursor: censusLayersReady ? 'pointer' : 'not-allowed',
                 fontSize: '0.9em',
-                boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.2)',
                 transition: 'all 0.3s ease'
               }}
             >
@@ -1620,10 +1638,13 @@ const App = () => {
                 bottom: '210px',
                 right: '20px',
                 zIndex: 1000,
-                background: 'rgba(255, 255, 255, 0.95)',
+                background: 'rgba(255, 255, 255, 0.75)',
+                backdropFilter: 'blur(20px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(180%)',
                 padding: '16px',
-                borderRadius: '8px',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                borderRadius: '12px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
                 minWidth: '220px'
               }}>
                 <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '10px' }}>
@@ -1657,10 +1678,13 @@ const App = () => {
                   right: '20px',
                   bottom: '70px',
                   zIndex: 1000,
-                  background: 'rgba(255, 255, 255, 0.95)',
+                  background: 'rgba(255, 255, 255, 0.75)',
+                  backdropFilter: 'blur(20px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
                   padding: '16px',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                  borderRadius: '12px',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.6)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
                   minWidth: '220px'
                 }}>
                   <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
@@ -1689,10 +1713,13 @@ const App = () => {
                   right: '20px',
                   bottom: '70px',
                   zIndex: 1000,
-                  background: 'rgba(255, 255, 255, 0.95)',
+                  background: 'rgba(255, 255, 255, 0.75)',
+                  backdropFilter: 'blur(20px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
                   padding: '16px',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                  borderRadius: '12px',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.6)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
                   minWidth: '220px'
                 }}>
                   <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
@@ -1718,7 +1745,7 @@ const App = () => {
           )}
 
           {loading && (
-            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(255, 255, 255, 0.9)', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.2)', zIndex: 1000 }}>
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', padding: '20px', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.6)', border: '1px solid rgba(255, 255, 255, 0.3)', zIndex: 1000 }}>
               <div style={{ width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #3498db', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 10px' }}></div>
               <div>{error || 'Loading map and projects...'}</div>
             </div>
@@ -1730,9 +1757,12 @@ const App = () => {
             position: 'absolute', 
             bottom: '30px', 
             right: '20px', 
-            background: 'white', 
+            background: 'rgba(255, 255, 255, 0.75)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
             borderRadius: '25px', 
-            boxShadow: '0 2px 10px rgba(0,0,0,0.2)', 
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.6)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
             zIndex: 1000,
             overflow: 'hidden'
           }}>
@@ -1778,8 +1808,12 @@ const App = () => {
           100% { transform: rotate(360deg); }
         }
         .mapboxgl-popup-content {
-          border-radius: 10px !important;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.2) !important;
+          background: rgba(255, 255, 255, 0.85) !important;
+          backdrop-filter: blur(20px) saturate(180%) !important;
+          -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+          border-radius: 16px !important;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.6) !important;
+          border: 1px solid rgba(255, 255, 255, 0.3) !important;
           padding-right: 30px; /* space for close button */
         }
         /* Ensure popups render above markers */
@@ -1791,14 +1825,16 @@ const App = () => {
           top: 6px;
           right: 6px;
           transform: none; /* ensure it sits inside */
-          background: #ffffff;
-          border-radius: 4px;
+          background: rgba(255, 255, 255, 0.8) !important;
+          backdrop-filter: blur(10px) saturate(180%) !important;
+          -webkit-backdrop-filter: blur(10px) saturate(180%) !important;
+          border-radius: 6px;
           width: 22px;
           height: 22px;
           line-height: 20px;
           text-align: center;
-          border: 1px solid #e1e5ea;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
         }
       `}</style>
        </div>
