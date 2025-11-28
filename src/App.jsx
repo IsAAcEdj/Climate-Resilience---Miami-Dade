@@ -299,11 +299,28 @@ const App = () => {
       marker.getElement().style.zIndex = '1';
     });
 
-    map.current.flyTo({
-      center: [-80.6327, 25.5516],
-      zoom: 11,
-      duration: 1500
-    });
+    // Use shifted bounds for reset view (shifted northeast)
+    if (allMarkers.length > 0) {
+      const bounds = new mapboxgl.LngLatBounds();
+      allMarkers.forEach(marker => {
+        const coords = marker.getLngLat();
+        bounds.extend([coords.lng, coords.lat]);
+      });
+      if (!bounds.isEmpty()) {
+        const shiftedBounds = shiftBoundsNortheast(bounds);
+        map.current.fitBounds(shiftedBounds, { 
+          padding: { top: 100, bottom: 100, left: 100, right: 100 },
+          maxZoom: 13,
+          duration: 1500 
+        });
+      }
+    } else {
+      map.current.flyTo({
+        center: [-80.6327, 25.5516],
+        zoom: 11,
+        duration: 1500
+      });
+    }
   };
 
 
@@ -317,25 +334,36 @@ const App = () => {
 
     if (!stats) return;
 
-    // Color mapping for FEMA Risk Ratings - More distinctive colors
-    const riskRatingColors = {
-      'Very Low': '#4CAF50',           // Bright Green
-      'Relatively Low': '#8BC34A',    // Lime Green
-      'Relatively Moderate': '#FFC107', // Amber/Yellow
-      'Relatively High': '#FF6F00',    // Red-Orange
-      'Very High': '#B71C1C'           // Dark Red
+    // Map risk ratings to numeric values for continuous yellow-to-red scale
+    const riskRatingValues = {
+      'Very Low': 0,
+      'Relatively Low': 0.25,
+      'Relatively Moderate': 0.5,
+      'Relatively High': 0.75,
+      'Very High': 1
     };
 
-    // Build color expression based on risk rating strings
+    // Build color expression based on risk rating strings using continuous yellow-to-red scale
     const buildRiskRatingColorExpression = () => {
-      const cases = [];
-      Object.entries(riskRatingColors).forEach(([rating, color]) => {
-        cases.push(['==', ['get', '__riskRating'], rating], color);
+      // First, map rating string to numeric value, then interpolate color
+      const ratingCases = [];
+      Object.entries(riskRatingValues).forEach(([rating, value]) => {
+        ratingCases.push(['==', ['get', '__riskRating'], rating], value);
       });
-      // Default color for missing or unknown ratings
-      cases.push('#9e9e9e'); // Gray
+      // Default to 0.5 (middle) for unknown ratings
+      ratingCases.push(0.5);
       
-      return ['case', ...cases];
+      // Map numeric value to color using continuous yellow-to-red interpolation
+      return [
+        'interpolate',
+        ['linear'],
+        ['case', ...ratingCases],
+        0, '#FFEB3B',      // Yellow (Very Low)
+        0.25, '#FFC107',   // Light Orange-Yellow (Relatively Low)
+        0.5, '#FF9800',    // Orange (Relatively Moderate)
+        0.75, '#F44336',   // Red (Relatively High)
+        1, '#B71C1C'       // Dark Red (Very High)
+      ];
     };
 
     const riskColorExpression = buildRiskRatingColorExpression();
@@ -584,7 +612,7 @@ const App = () => {
             </div>
             ${pred3PE !== null && pred3PE !== undefined ? `
             <div style="font-size: 0.9em; color: #1b3a4b; margin-bottom: 12px;">
-              <span style="font-weight: 600;">PRED3_PE:</span>
+              <span style="font-weight: 600;">Resilience Index:</span>
               <span style="margin-left: 6px;">${pred3PE.toFixed(2)}%</span>
             </div>
             ` : ''}
@@ -689,6 +717,27 @@ const App = () => {
     
     map.current.setStyle(newStyle);
     setIsSatelliteView(!isSatelliteView);
+  };
+
+  // Helper function to shift bounds northeast (to avoid south and west areas)
+  const shiftBoundsNortheast = (bounds) => {
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+    
+    // Calculate ranges
+    const lngRange = ne.lng - sw.lng;
+    const latRange = ne.lat - sw.lat;
+    
+    // Shift southwest corner northeast: 55% east, 35% north
+    const shiftLng = lngRange * 0.55;
+    const shiftLat = latRange * 0.35;
+    
+    // Create new bounds with shifted southwest corner
+    const shiftedBounds = new mapboxgl.LngLatBounds();
+    shiftedBounds.extend([sw.lng + shiftLng, sw.lat + shiftLat]);
+    shiftedBounds.extend([ne.lng, ne.lat]);
+    
+    return shiftedBounds;
   };
 
   useEffect(() => {
@@ -910,7 +959,13 @@ const App = () => {
           bounds.extend(feature.geometry.coordinates);
         });
         if (!bounds.isEmpty()) {
-          map.current.fitBounds(bounds, { padding: 50 });
+          // Use shifted bounds for default position (shifted northeast)
+          const shiftedBounds = shiftBoundsNortheast(bounds);
+          map.current.fitBounds(shiftedBounds, { 
+            padding: { top: 100, bottom: 100, left: 100, right: 100 },
+            maxZoom: 13,
+            duration: 0 // No animation on initial load
+          });
         }
 
         setLoading(false);
@@ -1127,15 +1182,7 @@ const App = () => {
     }
   }, [censusStats, censusLayersReady, addCensusSourceAndLayers]);
 
-  // Legend for risk ratings - More distinctive colors
-  const riskRatingColors = {
-    'Very Low': '#4CAF50',           // Bright Green
-    'Relatively Low': '#8BC34A',     // Lime Green
-    'Relatively Moderate': '#FFC107', // Amber/Yellow
-    'Relatively High': '#FF6F00',    // Red-Orange
-    'Very High': '#B71C1C'           // Dark Red
-  };
-  
+  // Legend for risk ratings - now using continuous yellow-to-red scale
   const legendRatings = censusStats?.risk?.ratings || [];
   const sortedRatings = ['Very Low', 'Relatively Low', 'Relatively Moderate', 'Relatively High', 'Very High']
     .filter(rating => legendRatings.includes(rating));
@@ -1193,11 +1240,22 @@ const App = () => {
     });
 
     if (!bounds.isEmpty()) {
-      map.current.fitBounds(bounds, { 
-        padding: { top: 150, bottom: 150, left: 150, right: 150 },
-        maxZoom: 12,
-        duration: 1500 
-      });
+      // If "All Cities" is selected, shift bounds to avoid south and west areas
+      if (!cityName || cityName === '') {
+        const shiftedBounds = shiftBoundsNortheast(bounds);
+        
+        map.current.fitBounds(shiftedBounds, { 
+          padding: { top: 100, bottom: 100, left: 100, right: 100 },
+          maxZoom: 13,
+          duration: 1500 
+        });
+      } else {
+        map.current.fitBounds(bounds, { 
+          padding: { top: 150, bottom: 150, left: 150, right: 150 },
+          maxZoom: 12,
+          duration: 1500 
+        });
+      }
     }
   };
 
@@ -1499,7 +1557,7 @@ const App = () => {
           {/* Type Filter */}
           <div style={{ marginBottom: '24px' }}>
             <h3 style={{ fontSize: '1.1em', fontWeight: '500', color: '#2c3e50', marginBottom: '12px' }}>
-              Type
+              Infrastructure Type
             </h3>
             <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
               {uniqueTypes.map(type => (
@@ -1596,7 +1654,7 @@ const App = () => {
           <div style={{
             position: 'absolute',
             right: '20px',
-            bottom: '320px',
+            bottom: '300px',
             zIndex: 1000
           }}>
             <button
@@ -1630,7 +1688,7 @@ const App = () => {
             <>
               <div style={{
                 position: 'absolute',
-                bottom: '210px',
+                bottom: '190px',
                 right: '20px',
                 zIndex: 1000,
                 background: 'rgba(255, 255, 255, 0.75)',
@@ -1643,7 +1701,7 @@ const App = () => {
                 minWidth: '220px'
               }}>
                 <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '10px' }}>
-                  View Layer By:
+                  Modelling Layer
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontSize: '0.9em', color: '#1b3a4b' }}>
                   <input
@@ -1653,7 +1711,7 @@ const App = () => {
                     checked={activeCensusView === 'risk'}
                     onChange={() => handleCensusViewChange('risk')}
                   />
-                  FEMA Risk Index
+                  Risk Index
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9em', color: '#1b3a4b' }}>
                   <input
@@ -1663,7 +1721,7 @@ const App = () => {
                     checked={activeCensusView === 'pred3pe'}
                     onChange={() => handleCensusViewChange('pred3pe')}
                   />
-                  PRED3_PE
+                  Resilience Index
                 </label>
               </div>
 
@@ -1690,10 +1748,15 @@ const App = () => {
                       width: '100%',
                       height: '20px',
                       borderRadius: '4px',
-                      background: 'linear-gradient(to right, #4CAF50 0%, #8BC34A 25%, #FFC107 50%, #FF6F00 75%, #B71C1C 100%)',
-                      border: '1px solid rgba(0,0,0,0.1)',
+                      overflow: 'hidden',
                       marginBottom: '8px'
-                    }}></div>
+                    }}>
+                      <div style={{
+                        width: '100%',
+                        height: '100%',
+                        background: 'linear-gradient(to right, #FFEB3B 0%, #FFEB3B 10%, #FFC107 28%, #FF9800 50%, #F44336 72%, #B71C1C 90%, #B71C1C 100%)'
+                      }}></div>
+                    </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75em', color: '#546e7a' }}>
                       <span>Very Low</span>
                       <span>Very High</span>
@@ -1718,17 +1781,22 @@ const App = () => {
                   minWidth: '220px'
                 }}>
                   <div style={{ fontSize: '1em', fontWeight: 600, color: '#1b3a4b', marginBottom: '12px' }}>
-                    PRED3_PE (%)
+                    Resilience Index (%)
                   </div>
                   <div style={{ marginBottom: '8px' }}>
                     <div style={{
                       width: '100%',
                       height: '20px',
                       borderRadius: '4px',
-                      background: 'linear-gradient(to right, #E8D4F5 0%, #D4B3E8 16.67%, #C298DB 33.33%, #A866C7 50%, #7A3FA8 66.67%, #5A1D85 83.33%, #2D0045 100%)',
-                      border: '1px solid rgba(0,0,0,0.1)',
+                      overflow: 'hidden',
                       marginBottom: '8px'
-                    }}></div>
+                    }}>
+                      <div style={{
+                        width: '100%',
+                        height: '100%',
+                        background: 'linear-gradient(to right, #E8D4F5 0%, #E8D4F5 10%, #D4B3E8 20%, #C298DB 35%, #A866C7 50%, #7A3FA8 65%, #5A1D85 80%, #2D0045 90%, #2D0045 100%)'
+                      }}></div>
+                    </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75em', color: '#546e7a' }}>
                       <span>{censusStats.pred3PE.min?.toFixed(1) || '0'}%</span>
                       <span>{censusStats.pred3PE.max?.toFixed(1) || '0'}%</span>
@@ -1895,7 +1963,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 6px', fontSize: '0.9em' }}>
           <tbody>
             <tr>
-              <td style={{ color: '#34495e', fontWeight: 600, width: 110 }}>Type</td>
+              <td style={{ color: '#34495e', fontWeight: 600, width: 110 }}>Infrastructure Type</td>
               <td style={{ color: '#2c3e50' }}>{props['Infrastructure Type'] || props['Type'] || '—'}</td>
             </tr>
             <tr>
