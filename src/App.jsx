@@ -109,6 +109,30 @@ const formatRiskValue = (value) => {
   return value.toFixed(2);
 };
 
+// Format cost using compact notation (e.g., "3M", "1.2B")
+const formatCostCompact = (cost) => {
+  try {
+    if (!cost || cost === null || cost === undefined) return null;
+    
+    // Convert to number if it's a string
+    const numericCost = typeof cost === 'string' 
+      ? parseFloat(cost.replace(/[$,]/g, '')) 
+      : parseFloat(cost);
+    
+    if (isNaN(numericCost) || !isFinite(numericCost)) return null;
+    
+    // Format using Intl.NumberFormat with compact notation
+    const options = { notation: "compact", compactDisplay: "short" };
+    const formattedNumber = new Intl.NumberFormat("en-US", options).format(numericCost);
+    
+    // Add dollar sign prefix
+    return `$${formattedNumber}`;
+  } catch (error) {
+    console.error('Error formatting cost:', error);
+    return null;
+  }
+};
+
 const App = () => {
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -1987,7 +2011,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Cost</td>
               <td style={{ color: (props['Estimated Project Cost'] == null) ?'#f39c12' : '#27ae60', fontWeight: 700 }}>{
-                  (props['Estimated Project Cost'] == null) ? 'Not Disclosed' : "$" + props['Estimated Project Cost']}</td>
+                  formatCostCompact(props['Estimated Project Cost']) || 'Not Disclosed'}</td>
             </tr>
           </tbody>
         </table>
