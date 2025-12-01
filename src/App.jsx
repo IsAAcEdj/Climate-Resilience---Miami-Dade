@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
 
@@ -1333,6 +1333,46 @@ const App = () => {
     }
   }, [selectedCity]);
 
+  // Calculate filtered statistics (project count and total investment)
+  const filteredStats = useMemo(() => {
+    if (!allProjectsData?.features) {
+      return { projectCount: 0, totalInvestment: 0 };
+    }
+
+    const filteredFeatures = allProjectsData.features.filter(feature => {
+      const props = feature.properties || {};
+      const type = props['Infrastructure Type'] || props['Type'];
+      const disasterFocus = props['Disaster Focus'];
+      const city = props['City'] ? props['City'].trim() : props['City'];
+      
+      const typeMatch = selectedTypes.length === 0 || selectedTypes.includes(type);
+      const disasterMatch = selectedDisasterFocus.length === 0 || selectedDisasterFocus.includes(disasterFocus);
+      const selectedCityTrimmed = selectedCity ? selectedCity.trim() : selectedCity;
+      const cityMatch = !selectedCityTrimmed || selectedCityTrimmed === '' || city === selectedCityTrimmed;
+
+      return typeMatch && disasterMatch && cityMatch;
+    });
+
+    const projectCount = filteredFeatures.length;
+    
+    // Calculate total investment
+    const totalInvestment = filteredFeatures.reduce((sum, feature) => {
+      const cost = feature.properties?.['Estimated Project Cost'];
+      if (!cost || cost === null || cost === undefined) return sum;
+      
+      // Convert to number if it's a string
+      const numericCost = typeof cost === 'string' 
+        ? parseFloat(cost.replace(/[$,]/g, '')) 
+        : parseFloat(cost);
+      
+      if (isNaN(numericCost) || !isFinite(numericCost)) return sum;
+      
+      return sum + numericCost;
+    }, 0);
+
+    return { projectCount, totalInvestment };
+  }, [allProjectsData, selectedTypes, selectedDisasterFocus, selectedCity]);
+
   return (
     <div style={{ margin: 0, padding: 0, fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif", backgroundColor: 'white', height: '100vh', width: '100%', overflow: 'hidden', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
       <div style={{ 
@@ -1662,6 +1702,75 @@ const App = () => {
                 Clear
               </button>
             )}
+          </div>
+
+          {/* Statistics Squares */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr', 
+            gap: '12px', 
+            marginTop: '24px',
+            paddingTop: '24px',
+            borderTop: '1px solid rgba(0, 0, 0, 0.1)'
+          }}>
+            {/* Total Projects Square */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.8)',
+              backdropFilter: 'blur(10px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(10px) saturate(180%)',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              borderRadius: '12px',
+              padding: '16px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.5)',
+              textAlign: 'center'
+            }}>
+              <div style={{ 
+                fontSize: '1.75em', 
+                fontWeight: 700, 
+                color: '#2c3e50',
+                marginBottom: '4px'
+              }}>
+                {filteredStats.projectCount}
+              </div>
+              <div style={{ 
+                fontSize: '0.75em', 
+                color: '#546e7a',
+                fontWeight: 500
+              }}>
+                Projects
+              </div>
+            </div>
+            
+            {/* Total Investment Square */}
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.8)',
+              backdropFilter: 'blur(10px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(10px) saturate(180%)',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              borderRadius: '12px',
+              padding: '16px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.5)',
+              textAlign: 'center'
+            }}>
+              <div style={{ 
+                fontSize: '1.5em', 
+                fontWeight: 700, 
+                color: '#2c3e50',
+                marginBottom: '4px',
+                lineHeight: 1.2
+              }}>
+                {filteredStats.totalInvestment > 0 
+                  ? formatCostCompact(filteredStats.totalInvestment)
+                  : '—'}
+              </div>
+              <div style={{ 
+                fontSize: '0.75em', 
+                color: '#546e7a',
+                fontWeight: 500
+              }}>
+                Total Investment
+              </div>
+            </div>
           </div>
         </aside>
 
