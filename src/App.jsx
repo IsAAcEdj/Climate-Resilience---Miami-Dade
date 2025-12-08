@@ -134,6 +134,17 @@ const formatCostCompact = (cost) => {
   }
 };
 
+// Format city name to title case (first letter of each word capitalized)
+const formatCityName = (cityName) => {
+  if (!cityName || typeof cityName !== 'string') return cityName;
+  return cityName
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 const App = () => {
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -340,11 +351,11 @@ const App = () => {
         });
       }
     } else {
-      map.current.flyTo({
-        center: [-80.6327, 25.5516],
-        zoom: 11,
-        duration: 1500
-      });
+    map.current.flyTo({
+      center: [-80.6327, 25.5516],
+      zoom: 11,
+      duration: 1500
+    });
     }
   };
 
@@ -897,6 +908,7 @@ const App = () => {
         console.log('[Projects] Loaded Cities.geojson:', data.features.length, 'features');
         console.log('[Projects] Sample properties:', data.features[0]?.properties ? Object.keys(data.features[0].properties).slice(0, 10) : 'No properties');
         console.log('[Projects] Sample Infrastruc value:', data.features[0]?.properties?.Infrastruc);
+        console.log('[Projects] Sample NAME (city) value:', data.features[0]?.properties?.NAME);
         setAllProjectsData(data);
 
         map.current.addSource('projects', {
@@ -939,9 +951,15 @@ const App = () => {
           const coordinates = feature.geometry.coordinates;
           const properties = feature.properties;
           
-          // Normalize city property by trimming whitespace
-          if (properties['City']) {
-            properties['City'] = properties['City'].trim();
+          // Normalize city property by trimming whitespace (use NAME field, fallback to City)
+          const cityField = properties['NAME'] || properties['City'];
+          if (cityField) {
+            if (properties['NAME']) {
+              properties['NAME'] = properties['NAME'].trim();
+            }
+            if (properties['City']) {
+              properties['City'] = properties['City'].trim();
+            }
           }
 
           const marker = new mapboxgl.Marker({
@@ -1220,9 +1238,15 @@ const App = () => {
     if (!allProjectsData?.features) return [];
     const values = allProjectsData.features
       .map(f => {
-        const value = f.properties?.[field];
-        // Trim whitespace for City field
-        return (field === 'City' && value) ? value.trim() : value;
+        // For city, prefer NAME field, fallback to City
+        let value;
+        if (field === 'City' || field === 'NAME') {
+          value = f.properties?.['NAME'] || f.properties?.['City'];
+        } else {
+          value = f.properties?.[field];
+        }
+        // Trim whitespace for city fields
+        return ((field === 'City' || field === 'NAME') && value) ? value.trim() : value;
       })
       .filter(v => v && v !== null && v !== undefined && v !== 'Null')
       .filter((v, i, arr) => arr.indexOf(v) === i)
@@ -1239,7 +1263,8 @@ const App = () => {
   const disasterFocusNew = getUniqueValues('Disaster_F');
   const disasterFocusLegacy = getUniqueValues('Disaster Focus');
   const uniqueDisasterFocus = disasterFocusNew.length > 0 ? disasterFocusNew : disasterFocusLegacy;
-  const uniqueCities = getUniqueValues('City');
+  // Get unique cities - prefer NAME field, fallback to City
+  const uniqueCities = getUniqueValues('NAME');
 
   // Zoom to city markers when city is selected
   const zoomToCity = (cityName) => {
@@ -1256,7 +1281,7 @@ const App = () => {
         allMarkers.filter(marker => {
           if (!marker.feature) return false;
           const props = marker.feature.properties || {};
-          const markerCity = props['City'] ? props['City'].trim() : props['City'];
+          const markerCity = (props['NAME'] || props['City']) ? (props['NAME'] || props['City']).trim() : (props['NAME'] || props['City']);
           const selectedCityTrimmed = cityName ? cityName.trim() : cityName;
           return markerCity === selectedCityTrimmed;
         });
@@ -1300,7 +1325,7 @@ const App = () => {
       const type = props['Infrastruc'] || props['Infrastructure Type'] || props['Type'];
       const category = props['Categories'];
       const disasterFocus = props['Disaster_F'] || props['Disaster Focus'];
-      const city = props['City'] ? props['City'].trim() : props['City'];
+      const city = (props['NAME'] || props['City']) ? (props['NAME'] || props['City']).trim() : (props['NAME'] || props['City']);
 
       const typeMatch = selectedTypes.length === 0 || selectedTypes.includes(type);
       const disasterMatch = selectedDisasterFocus.length === 0 || selectedDisasterFocus.includes(disasterFocus);
@@ -1350,7 +1375,7 @@ const App = () => {
       const props = feature.properties || {};
       const type = props['Infrastruc'] || props['Infrastructure Type'] || props['Type'];
       const disasterFocus = props['Disaster_F'] || props['Disaster Focus'];
-      const city = props['City'] ? props['City'].trim() : props['City'];
+      const city = (props['NAME'] || props['City']) ? (props['NAME'] || props['City']).trim() : (props['NAME'] || props['City']);
       
       const typeMatch = selectedTypes.length === 0 || selectedTypes.includes(type);
       const disasterMatch = selectedDisasterFocus.length === 0 || selectedDisasterFocus.includes(disasterFocus);
@@ -1391,7 +1416,7 @@ const App = () => {
       const props = feature.properties || {};
       const type = props['Infrastruc'] || props['Infrastructure Type'] || props['Type'];
       const disasterFocus = props['Disaster_F'] || props['Disaster Focus'];
-      const city = props['City'] ? props['City'].trim() : props['City'];
+      const city = (props['NAME'] || props['City']) ? (props['NAME'] || props['City']).trim() : (props['NAME'] || props['City']);
       
       const typeMatch = selectedTypes.length === 0 || selectedTypes.includes(type);
       const disasterMatch = selectedDisasterFocus.length === 0 || selectedDisasterFocus.includes(disasterFocus);
@@ -1619,7 +1644,7 @@ const App = () => {
                 transition: 'all 0.2s ease'
               }}
             >
-              <span>{selectedCity || 'All Cities'}</span>
+              <span>{selectedCity ? formatCityName(selectedCity) : 'All Cities'}</span>
               <span style={{ fontSize: '0.7em' }}>▼</span>
             </div>
             {cityDropdownOpen && (
@@ -1678,7 +1703,7 @@ const App = () => {
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(240, 248, 255, 0.5)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedCity === city ? 'rgba(240, 248, 255, 0.7)' : 'transparent'}
                   >
-                    {city}
+                    {formatCityName(city)}
                   </div>
                 ))}
               </div>
@@ -2016,7 +2041,7 @@ const App = () => {
                         width: '100%',
                         height: '100%',
                         background: 'linear-gradient(to right, #FFEB3B 0%, #FFEB3B 10%, #FFC107 28%, #FF9800 50%, #F44336 72%, #B71C1C 90%, #B71C1C 100%)'
-                      }}></div>
+                    }}></div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75em', color: '#546e7a' }}>
                       <span>Very Low</span>
@@ -2237,7 +2262,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>City</td>
-              <td style={{ color: '#2c3e50' }}>{props['City'] ? props['City'].trim() : (props['City'] || '—')}</td>
+              <td style={{ color: '#2c3e50' }}>{(props['NAME'] || props['City']) ? formatCityName((props['NAME'] || props['City']).trim()) : '—'}</td>
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Status</td>
