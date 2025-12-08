@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 
 const parseNumericValue = (value) => {
@@ -886,13 +887,16 @@ const App = () => {
       }
 
       try {
-        const response = await fetch('/proj_final.geojson');
+        const response = await fetch('/Cities.geojson');
 
         if (!response.ok) {
           throw new Error(`Failed to load project data: ${response.status}`);
         }
 
         const data = await response.json();
+        console.log('[Projects] Loaded Cities.geojson:', data.features.length, 'features');
+        console.log('[Projects] Sample properties:', data.features[0]?.properties ? Object.keys(data.features[0].properties).slice(0, 10) : 'No properties');
+        console.log('[Projects] Sample Infrastruc value:', data.features[0]?.properties?.Infrastruc);
         setAllProjectsData(data);
 
         map.current.addSource('projects', {
@@ -941,7 +945,7 @@ const App = () => {
           }
 
           const marker = new mapboxgl.Marker({
-            color: getMarkerColor(properties['Infrastructure Type'] || properties['Type']),
+            color: getMarkerColor(properties['Infrastruc'] || properties['Infrastructure Type'] || properties['Type']),
             scale: 0.7
           })
             .setLngLat(coordinates);
@@ -1226,12 +1230,15 @@ const App = () => {
     return values;
   };
 
-  // Get unique types - prefer 'Infrastructure Type', fallback to 'Type'
-  const infrastructureTypes = getUniqueValues('Infrastructure Type');
-  const legacyTypes = getUniqueValues('Type');
-  const uniqueTypes = infrastructureTypes.length > 0 ? infrastructureTypes : legacyTypes;
+  // Get unique types - prefer 'Infrastruc', fallback to 'Infrastructure Type' or 'Type'
+  const infrastructureTypes = getUniqueValues('Infrastruc');
+  const legacyTypes = getUniqueValues('Infrastructure Type');
+  const fallbackTypes = getUniqueValues('Type');
+  const uniqueTypes = infrastructureTypes.length > 0 ? infrastructureTypes : (legacyTypes.length > 0 ? legacyTypes : fallbackTypes);
   const uniqueCategories = getUniqueValues('Categories');
-  const uniqueDisasterFocus = getUniqueValues('Disaster Focus');
+  const disasterFocusNew = getUniqueValues('Disaster_F');
+  const disasterFocusLegacy = getUniqueValues('Disaster Focus');
+  const uniqueDisasterFocus = disasterFocusNew.length > 0 ? disasterFocusNew : disasterFocusLegacy;
   const uniqueCities = getUniqueValues('City');
 
   // Zoom to city markers when city is selected
@@ -1290,9 +1297,9 @@ const App = () => {
     allMarkers.forEach(marker => {
       if (!marker.feature) return;
       const props = marker.feature.properties || {};
-      const type = props['Infrastructure Type'] || props['Type'];
+      const type = props['Infrastruc'] || props['Infrastructure Type'] || props['Type'];
       const category = props['Categories'];
-      const disasterFocus = props['Disaster Focus'];
+      const disasterFocus = props['Disaster_F'] || props['Disaster Focus'];
       const city = props['City'] ? props['City'].trim() : props['City'];
 
       const typeMatch = selectedTypes.length === 0 || selectedTypes.includes(type);
@@ -1341,8 +1348,8 @@ const App = () => {
 
     const filteredFeatures = allProjectsData.features.filter(feature => {
       const props = feature.properties || {};
-      const type = props['Infrastructure Type'] || props['Type'];
-      const disasterFocus = props['Disaster Focus'];
+      const type = props['Infrastruc'] || props['Infrastructure Type'] || props['Type'];
+      const disasterFocus = props['Disaster_F'] || props['Disaster Focus'];
       const city = props['City'] ? props['City'].trim() : props['City'];
       
       const typeMatch = selectedTypes.length === 0 || selectedTypes.includes(type);
@@ -1357,7 +1364,7 @@ const App = () => {
     
     // Calculate total investment
     const totalInvestment = filteredFeatures.reduce((sum, feature) => {
-      const cost = feature.properties?.['Estimated Project Cost'];
+      const cost = feature.properties?.['Estimated_'] || feature.properties?.['Estimated Project Cost'];
       if (!cost || cost === null || cost === undefined) return sum;
       
       // Convert to number if it's a string
@@ -1371,6 +1378,66 @@ const App = () => {
     }, 0);
 
     return { projectCount, totalInvestment };
+  }, [allProjectsData, selectedTypes, selectedDisasterFocus, selectedCity]);
+
+  // Calculate pie chart data based on city, disaster focus, and infrastructure type filters
+  const pieChartData = useMemo(() => {
+    if (!allProjectsData?.features) {
+      return [];
+    }
+
+    // Filter by city, disaster focus, and infrastructure type
+    const filteredFeatures = allProjectsData.features.filter(feature => {
+      const props = feature.properties || {};
+      const type = props['Infrastruc'] || props['Infrastructure Type'] || props['Type'];
+      const disasterFocus = props['Disaster_F'] || props['Disaster Focus'];
+      const city = props['City'] ? props['City'].trim() : props['City'];
+      
+      const typeMatch = selectedTypes.length === 0 || selectedTypes.includes(type);
+      const disasterMatch = selectedDisasterFocus.length === 0 || selectedDisasterFocus.includes(disasterFocus);
+      const selectedCityTrimmed = selectedCity ? selectedCity.trim() : selectedCity;
+      const cityMatch = !selectedCityTrimmed || selectedCityTrimmed === '' || city === selectedCityTrimmed;
+
+      return typeMatch && disasterMatch && cityMatch;
+    });
+
+    // Count projects by infrastructure type
+    const typeCounts = {};
+    filteredFeatures.forEach(feature => {
+      const props = feature.properties || {};
+      const type = props['Infrastruc'] || props['Infrastructure Type'] || props['Type'] || 'Unknown';
+      
+      // Normalize type names
+      let normalizedType = type;
+      if (type === 'Blue Infrastructure' || type === 'Blue') {
+        normalizedType = 'Blue';
+      } else if (type === 'Green Infrastructure' || type === 'Green') {
+        normalizedType = 'Green';
+      } else if (type === 'Grey Infrastructure' || type === 'Grey') {
+        normalizedType = 'Grey';
+      } else if (type === 'Hybrid') {
+        normalizedType = 'Hybrid';
+      }
+      
+      typeCounts[normalizedType] = (typeCounts[normalizedType] || 0) + 1;
+    });
+
+    // Convert to array format for recharts
+    const colors = {
+      'Blue': '#3498db',
+      'Green': '#27ae60',
+      'Grey': '#95a5a6',
+      'Hybrid': '#9b59b6',
+      'Unknown': '#95a5a6'
+    };
+
+    return Object.entries(typeCounts)
+      .map(([name, value]) => ({
+        name,
+        value,
+        color: colors[name] || '#95a5a6'
+      }))
+      .sort((a, b) => b.value - a.value); // Sort by count descending
   }, [allProjectsData, selectedTypes, selectedDisasterFocus, selectedCity]);
 
   return (
@@ -1772,6 +1839,67 @@ const App = () => {
               </div>
             </div>
           </div>
+
+          {/* Pie Chart */}
+          {pieChartData.length > 0 && (
+            <div style={{
+              marginTop: '24px',
+              paddingTop: '24px',
+              borderTop: '1px solid rgba(0, 0, 0, 0.1)'
+            }}>
+              <h3 style={{ 
+                fontSize: '1em', 
+                fontWeight: '500', 
+                color: '#2c3e50', 
+                marginBottom: '12px',
+                textAlign: 'center'
+              }}>
+                Infrastructure Type Distribution
+              </h3>
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.8)',
+                backdropFilter: 'blur(10px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(10px) saturate(180%)',
+                border: '1px solid rgba(255, 255, 255, 0.4)',
+                borderRadius: '12px',
+                padding: '12px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.5)'
+              }}>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={55}
+                      fill="#8884d8"
+                      dataKey="value"
+                      isAnimationActive={false}
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value) => [`${value} projects`, 'Count']}
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid rgba(0, 0, 0, 0.1)',
+                        borderRadius: '8px',
+                        padding: '8px'
+                      }}
+                    />
+                    <Legend 
+                      verticalAlign="bottom"
+                      height={36}
+                      iconType="circle"
+                      wrapperStyle={{ fontSize: '0.75em', paddingTop: '8px' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
         </aside>
 
         
@@ -2091,13 +2219,13 @@ const MapboxPopup = ({ map, activeFeature }) => {
     <>{createPortal(
       <div className="portal-content" style={{ maxWidth: 360 }}>
         <div style={{ fontSize: '1.05em', fontWeight: 700, color: '#2c3e50', marginBottom: 10 }}>
-          {props['Project Name'] || 'Project'}
+          {props['Project_Na'] || props['Project Name'] || 'Project'}
         </div>
         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 6px', fontSize: '0.9em' }}>
           <tbody>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600, width: 110 }}>Infrastructure Type</td>
-              <td style={{ color: '#2c3e50' }}>{props['Infrastructure Type'] || props['Type'] || '—'}</td>
+              <td style={{ color: '#2c3e50' }}>{props['Infrastruc'] || props['Infrastructure Type'] || props['Type'] || '—'}</td>
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Category</td>
@@ -2105,7 +2233,7 @@ const MapboxPopup = ({ map, activeFeature }) => {
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Focus</td>
-              <td style={{ color: '#2c3e50' }}>{props['Disaster Focus'] || '—'}</td>
+              <td style={{ color: '#2c3e50' }}>{props['Disaster_F'] || props['Disaster Focus'] || '—'}</td>
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>City</td>
@@ -2113,20 +2241,20 @@ const MapboxPopup = ({ map, activeFeature }) => {
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Status</td>
-              <td style={{ color: (props['Project Status'] || '').toLowerCase() === 'completed' ? '#27ae60' : '#f39c12', fontWeight: 700 }}>
-                {props['Project Status'] || 'Unknown'}
+              <td style={{ color: (props['Project__1'] || props['Project Status'] || '').toLowerCase() === 'completed' ? '#27ae60' : '#f39c12', fontWeight: 700 }}>
+                {props['Project__1'] || props['Project Status'] || 'Unknown'}
               </td>
             </tr>
             <tr>
               <td style={{ color: '#34495e', fontWeight: 600 }}>Cost</td>
-              <td style={{ color: (props['Estimated Project Cost'] == null) ?'#f39c12' : '#27ae60', fontWeight: 700 }}>{
-                  formatCostCompact(props['Estimated Project Cost']) || 'Not Disclosed'}</td>
+              <td style={{ color: ((props['Estimated_'] || props['Estimated Project Cost']) == null) ?'#f39c12' : '#27ae60', fontWeight: 700 }}>{
+                  formatCostCompact(props['Estimated_'] || props['Estimated Project Cost']) || 'Not Disclosed'}</td>
             </tr>
           </tbody>
         </table>
-        {props['New 15-25 Words Project Description'] && (
+        {(props['New_15_25_'] || props['New 15-25 Words Project Description']) && (
           <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #ecf0f1', color: '#7f8c8d', fontSize: '0.85em', lineHeight: 1.4 }}>
-            {props['New 15-25 Words Project Description']}
+            {props['New_15_25_'] || props['New 15-25 Words Project Description']}
           </div>
         )}
       </div>,
