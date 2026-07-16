@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
+import mapboxgl from 'mapbox-gl';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { searchProjects } from './utils/searchProjects.js';
 
@@ -1282,12 +1282,8 @@ const App = () => {
         processedFeatures.forEach(feature => {
           if (!feature.geometry) return;
           walkCoordinates(feature.geometry, coord => {
-            if (!hasBounds) {
-              bounds.set(coord, coord);
-              hasBounds = true;
-            } else {
-              bounds.extend(coord);
-            }
+            bounds.extend(coord);
+            hasBounds = true;
           });
         });
 
