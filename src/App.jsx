@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import mapboxgl from 'https://cdn.skypack.dev/mapbox-gl@2.15.0';
+import mapboxgl from 'mapbox-gl';
 
 
 const parseNumericValue = (value) => {
@@ -554,7 +554,8 @@ const App = () => {
     map.current.on('load', async () => {
 
     try{
-      map.current.addSource(districtId, {
+      Object.entries(districtsRef.current).forEach(([districtId, district]) => {
+        map.current.addSource(districtId, {
             type: 'geojson',
             data: {
               type: 'Feature',
@@ -600,6 +601,7 @@ const App = () => {
           map.current.on('mouseleave', `${districtId}-fill`, () => {
             map.current.getCanvas().style.cursor = '';
           });
+      });
 
       } catch (err) {
         console.error('City initialization error:', err);
@@ -783,12 +785,8 @@ const App = () => {
         processedFeatures.forEach(feature => {
           if (!feature.geometry) return;
           walkCoordinates(feature.geometry, coord => {
-            if (!hasBounds) {
-              bounds.set(coord, coord);
-              hasBounds = true;
-            } else {
-              bounds.extend(coord);
-            }
+            bounds.extend(coord);
+            hasBounds = true;
           });
         });
 
